@@ -1,6 +1,7 @@
 import FWCore.ParameterSet.Config as cms
+from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
 
-diamondTimingAnalyzer = cms.EDProducer("DiamondTimingAnalyzer",
+diamondTimingWorker = DQMEDAnalyzer("DiamondTimingWorker",
     tagDigi = cms.InputTag("ctppsDiamondRawToDigi", "TimingDiamond"),
     tagRecHit = cms.InputTag("ctppsDiamondRecHits"),
     tagPixelLocalTrack = cms.InputTag("ctppsPixelLocalTracks"),
