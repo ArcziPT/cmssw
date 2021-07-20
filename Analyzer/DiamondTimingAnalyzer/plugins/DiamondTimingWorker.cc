@@ -36,7 +36,12 @@
 //
 
 struct Histograms_DiamondTiming {
- dqm::reco::MonitorElement* histo_;
+  dqm::reco::MonitorElement* histo_;
+  std::map<uint32_t, dqm::reco::MonitorElement*> t;
+  std::map<uint32_t, dqm::reco::MonitorElement*> valid_t;
+  std::map<uint32_t, dqm::reco::MonitorElement*> tot;
+  std::map<uint32_t, dqm::reco::MonitorElement*> valid_tot;
+  std::map<uint32_t, dqm::reco::MonitorElement*> t_vs_tot;
 };
 
 class DiamondTimingWorker : public DQMEDAnalyzer {
@@ -88,18 +93,30 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
 void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
                                            edm::Run const& run,
                                            edm::EventSetup const& iSetup) {
+  
   iBooker.setCurrentFolder(folder_);
   histos.histo_ = iBooker.book1D("EXAMPLE", "EXAMPLE", 10, 0., 10.);
-
+  
+  std::string ch_name, ch_path;
   const auto& geom = iSetup.getData(geomEsToken_);
   for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
     if (!CTPPSDiamondDetId::check(it->first))
       continue;
     
     const CTPPSDiamondDetId detid(it->first);
+
+    // if(detid.station() != 1)
+    //   continue;
+
+    detid.channelName(ch_name);
+    detid.channelName(ch_path, CTPPSDiamondDetId::nPath);
+
+    iBooker.setCurrentFolder(folder_ + "/" + ch_path);
     
-    if (detid.station() != 1)
-      continue;
+    histos.t[detid.rawId()] = iBooker.book1D("t_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60., 60.);
+    histos.tot[detid.rawId()] = iBooker.book1D("tot_" + ch_name, ch_name + ";ToT (ns);Entries", 100, -20., 20.);
+    histos.t_vs_tot[detid.rawId()] =
+        iBooker.book2D("t_vs_tot_" + ch_name, ch_name + ";ToT (ns);t (ns)", 240, 0., 60., 450, -20., 25.);
   }
 }
 
