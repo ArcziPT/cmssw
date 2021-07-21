@@ -47,6 +47,10 @@ struct ChannelKey
 		ChannelKey(const int sector=-1, const int plane=-1, const int channel=-1)
 		: sector(sector), plane(plane), channel(channel)
 		{};
+
+		ChannelKey(const CTPPSDiamondDetId& detid)
+		: sector(detid.arm()), plane(detid.plane()), channel(detid.channel())
+		{};
 	};
 	
 struct Calib_par

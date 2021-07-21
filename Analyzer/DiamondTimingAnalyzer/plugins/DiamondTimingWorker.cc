@@ -68,6 +68,10 @@ private:
     std::map<uint32_t, MonitorElement*> tot;
     std::map<uint32_t, MonitorElement*> valid_tot;
     std::map<uint32_t, MonitorElement*> t_vs_tot;
+
+    std::map<ChannelKey, MonitorElement*> l2_res;
+    std::map<ChannelKey, MonitorElement*> trk_time;
+    std::map<ChannelKey, MonitorElement*> expected_trk_time;
   };
   Histograms_DiamondTiming histos;
 
@@ -100,6 +104,9 @@ private:
 //
 // static data member definitions
 //
+  static const int CHANNELS_X_PLANE  = 12;
+  static const int PLANES_X_DETECTOR = 4;
+  static const int MAX_SECTOR_NUMBER = 2;
 
 //
 // constructors and destructor
@@ -186,8 +193,8 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
   //
   /////////////////////////////////////////////////////////////////  
   for (const auto& recHits : *timingRecHit){ //rechits = array of hits in one channel
-    const CTPPSDiamondDetId detId(recHits.detId());
-	  if(!(Sector_TBA[detId.arm()])) continue;
+    const CTPPSDiamondDetId detid(recHits.detId());
+	  if(!(Sector_TBA[detid.arm()])) continue;
 	
 	  // Perform channel histogram
     for (const auto& recHit : recHits){ //rechit
@@ -198,16 +205,108 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
         continue;
 	
       //T,TOT and OOT for all hits, important for monitoring the calibration	
-		  histos.t[detId.rawId()]-> Fill(recHit.time());
-		  histos.tot[detId.rawId()]-> Fill(recHit.toT());
+		  histos.t[detid.rawId()]-> Fill(recHit.time());
+		  histos.tot[detid.rawId()]-> Fill(recHit.toT());
 
       // T,TOT and OOT complete hits (T and TOT available), important for monitoring the calibration
-      if(DiamondDet.PadActive(detId.arm(), detId.plane(),detId.channel())){
-        histos.valid_tot[detId.rawId()]-> Fill(DiamondDet.GetToT(detId.arm(), detId.plane(),detId.channel()));
-        histos.t_vs_tot[detId.rawId()]-> Fill(DiamondDet.GetToT(detId.arm(), detId.plane(),detId.channel()), DiamondDet.GetTime(detId.arm(), detId.plane(),detId.channel()));
-        histos.valid_t[detId.rawId()]-> Fill(DiamondDet.GetTime(detId.arm(), detId.plane(),detId.channel()));
+      if(DiamondDet.PadActive(detid.arm(), detid.plane(), detid.channel())){
+        histos.valid_tot[detid.rawId()]-> Fill(DiamondDet.GetToT(detid.arm(), detid.plane(),detid.channel()));
+        histos.t_vs_tot[detid.rawId()]-> Fill(DiamondDet.GetToT(detid.arm(), detid.plane(),detid.channel()), DiamondDet.GetTime(detid.arm(), detid.plane(),detid.channel()));
+        histos.valid_t[detid.rawId()]-> Fill(DiamondDet.GetTime(detid.arm(), detid.plane(),detid.channel()));
       }
     }
+  }
+
+  
+  ////////////////////////////////////////////////////////////////
+  //
+  //		RESOLUTION STUDIES
+  //
+  ///////////////////////////////////////////////////////////////// 
+	
+
+  ////////////////////////////////////////////////////////////////
+  //
+  //		4 planes!!!!!
+  //
+  ///////////////////////////////////////////////////////////////// 
+
+  for (const auto& LocalTrack_mapIter : DiamondDet.GetDiamondTrack_map()){ // loop on predigested tracks
+	  int sec_number = LocalTrack_mapIter.first.z0() > 0.0 ? SECTOR_45_ID : SECTOR_56_ID;
+    
+    if(!(Sector_TBA[sec_number])) 
+      continue;
+
+    if(LocalTrack_mapIter.second.size() == 0) 
+      continue;
+
+    bool mark_tag = DiamondDet.GetMuxInTrack(sec_number, PLANE_0_ID) == 1 && 
+                    DiamondDet.GetMuxInTrack(sec_number, PLANE_1_ID) == 1 && 
+                    DiamondDet.GetMuxInTrack(sec_number, PLANE_2_ID) == 1 && 
+                    DiamondDet.GetMuxInTrack(sec_number, PLANE_3_ID) == 1 &&
+                    DiamondDet.GetTrackMuxInSector(sec_number) == 1;
+	
+	  std::vector<ChannelKey> hit_selected(4);
+	  std::vector<std::pair<ChannelKey,CTPPSDiamondRecHit>>::const_iterator hit_iter;
+	
+	  double Track_time_SPC = 100.0;
+	  double Track_precision_SPC = 100.0;
+
+    // hits in track loop LocalTrack_mapIter.second = std::vector<std::pair<ChannelKey,CTPPSDiamondRecHit>>
+	  for(hit_iter = LocalTrack_mapIter.second.begin(); hit_iter < LocalTrack_mapIter.second.end(); hit_iter++){ 
+	    //std::cout << "looping on hits" << std::endl;
+		  double hit_time_SPC= DiamondDet.GetTime((*hit_iter).first.sector,(*hit_iter).first.plane,(*hit_iter).first.channel);
+		  double hit_prec_SPC= DiamondDet.GetPadPrecision((*hit_iter).first.sector,(*hit_iter).first.plane,(*hit_iter).first.channel);
+		  double hit_weig_SPC= DiamondDet.GetPadWeight((*hit_iter).first.sector,(*hit_iter).first.plane,(*hit_iter).first.channel);
+		
+		  if (mark_tag)
+				hit_selected[(*hit_iter).first.plane] = (*hit_iter).first;  // save for resolution reco
+		
+		  if(hit_iter == LocalTrack_mapIter.second.begin()){
+			  Track_time_SPC = hit_time_SPC;
+			  Track_precision_SPC =  hit_prec_SPC;
+		  }else{
+			  Track_time_SPC = (Track_time_SPC*pow(Track_precision_SPC,-2) + hit_time_SPC*hit_weig_SPC)/(pow(Track_precision_SPC,-2)+hit_weig_SPC);
+			  Track_precision_SPC = pow((pow(Track_precision_SPC,-2)+hit_weig_SPC),-0.5);	
+		  }
+		}
+
+	  if(mark_tag){
+		  for (int pl_mark = 0 ; pl_mark < PLANES_X_DETECTOR; pl_mark++){
+			  double Marked_track_time = 12.5;
+			  double Marked_track_precision = 25.0;
+			  double Marked_hit_time=0.0;
+			  int Marked_hit_channel=-1;
+			
+			  for (int pl_loop = 0 ; pl_loop < PLANES_X_DETECTOR; pl_loop++){
+				  if (pl_loop == pl_mark){
+					  Marked_hit_time = DiamondDet.GetTime(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
+					  Marked_hit_channel = hit_selected[pl_loop].channel;
+					  continue;
+				  }
+
+				  double Others_hit_time = DiamondDet.GetTime(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
+				  double Others_hit_prec = DiamondDet.GetPadPrecision(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
+				  double Others_hit_weig = DiamondDet.GetPadWeight(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
+				 
+			    if (hit_iter == LocalTrack_mapIter.second.begin()){
+					  Marked_track_time = Others_hit_time;
+					  Marked_track_precision = Others_hit_prec;
+          }else{	
+					  Marked_track_time = (Marked_track_time*pow(Marked_track_precision,-2) + Others_hit_time*Others_hit_weig)/(pow(Marked_track_precision,-2)+Others_hit_weig);
+					  Marked_track_precision = pow((pow(Marked_track_precision,-2)+Others_hit_weig),-0.5);	
+				  }
+			  }
+			
+			  double Marked_hit_difference = Marked_hit_time-Marked_track_time;
+
+        ChannelKey key(sec_number, pl_mark, Marked_hit_channel);
+
+        histos.l2_res[key]-> Fill(Marked_hit_difference);
+			  histos.trk_time[key]-> Fill(Marked_track_time);
+			  histos.expected_trk_time[key]-> Fill(Marked_track_precision);
+		  }
+	  }
   }
 }
 
@@ -223,6 +322,7 @@ void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
       continue;
     
     const CTPPSDiamondDetId detid(it->first);
+    ChannelKey key(detid);
 
     // if(detid.station() != 1)
     //   continue;
@@ -238,6 +338,10 @@ void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
     histos.valid_tot[detid.rawId()] = iBooker.book1D("valid_tot_" + ch_name, ch_name + ";ToT (ns);Entries", 100, -20., 20.);
     histos.t_vs_tot[detid.rawId()] =
         iBooker.book2D("t_vs_tot_" + ch_name, ch_name + ";ToT (ns);t (ns)", 240, 0., 60., 450, -20., 25.);
+
+		histos.l2_res[key] = iBooker.book1D("l2_res_" + ch_name, ch_name + ";x;y", 1200, -60, 60 );
+		histos.trk_time[key] = iBooker.book1D("trk_time_" + ch_name, ch_name + ";x;y", 1200, -60, 60 );		
+		histos.expected_trk_time[key] = iBooker.book1D("expected_trk_time_" + ch_name, ch_name + ";x;y", 1000, 0, 2 );		
   }
 }
 
