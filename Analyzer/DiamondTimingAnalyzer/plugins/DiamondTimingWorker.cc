@@ -31,6 +31,14 @@
 #include "Geometry/Records/interface/VeryForwardRealGeometryRecord.h"
 #include "DataFormats/CTPPSDetId/interface/CTPPSDiamondDetId.h"
 
+#include "DataFormats/CTPPSDigi/interface/CTPPSDiamondDigi.h"
+#include "DataFormats/CTPPSDetId/interface/CTPPSDiamondDetId.h"
+#include "DataFormats/CTPPSReco/interface/CTPPSDiamondRecHit.h"
+#include "DataFormats/CTPPSReco/interface/CTPPSDiamondLocalTrack.h"
+
+#include "DataFormats/CTPPSReco/interface/CTPPSPixelLocalTrack.h"
+#include "DiamondDetectorClass.h"
+
 //
 // class declaration
 //
@@ -55,16 +63,40 @@ private:
   void bookHistograms(DQMStore::IBooker &iBooker, edm::Run const &, edm::EventSetup const &iSetup) override;
   void analyze(const edm::Event &iEvent, const edm::EventSetup &iSetup) override;
 
-  // ------------ member data ------------
-  std::string folder_ = "data";
-
-  Histograms_DiamondTiming histos;
+  // ---------- objects to retrieve ---------------------------
+  edm::EDGetTokenT<edm::DetSetVector<CTPPSDiamondDigi>> tokenDigi_;
+  edm::EDGetTokenT<edm::DetSetVector<CTPPSDiamondRecHit>> tokenRecHit_;
+  edm::EDGetTokenT<edm::DetSetVector<CTPPSDiamondLocalTrack>> tokenLocalTrack_;
+  edm::EDGetTokenT<edm::DetSetVector<CTPPSPixelLocalTrack>> tokenPixelLocalTrack_;
   edm::ESGetToken<CTPPSGeometry, VeryForwardRealGeometryRecord> geomEsToken_;
+
+  // ------------ member data ------------
+  Histograms_DiamondTiming histos;
+  DiamondDetectorClass DiamondDet;
+  int validOOT;
+  std::map< std::pair< int , int >, std::pair< int , int > > Ntracks_cuts_map_; //arm, station ,, Lcut,Ucut
 };
 
 //
 // constants, enums and typedefs
 //
+  enum Sector_id_{
+		SECTOR_45_ID,
+		SECTOR_56_ID
+  };
+	  
+	enum Plane_id_{
+		PLANE_0_ID,
+		PLANE_1_ID,
+		PLANE_2_ID,
+		PLANE_3_ID
+	};
+	  
+	enum Station_id_{
+		STATION_210_M_ID,
+		STATION_TIMING_ID,
+		STATION_220_M_ID
+  };
 
 //
 // static data member definitions
@@ -74,8 +106,23 @@ private:
 // constructors and destructor
 //
 DiamondTimingWorker::DiamondTimingWorker(const edm::ParameterSet& iConfig)
-  : geomEsToken_(esConsumes<edm::Transition::BeginRun>()) {
-  // now do what ever initialization is needed
+  :
+  tokenDigi_(consumes<edm::DetSetVector<CTPPSDiamondDigi>>(iConfig.getParameter<edm::InputTag>("tagDigi"))),
+  tokenRecHit_(consumes<edm::DetSetVector<CTPPSDiamondRecHit>>(iConfig.getParameter<edm::InputTag>("tagRecHit"))),
+  tokenLocalTrack_(consumes<edm::DetSetVector<CTPPSDiamondLocalTrack>>(iConfig.getParameter<edm::InputTag>("tagLocalTrack"))),
+  tokenPixelLocalTrack_(consumes<edm::DetSetVector<CTPPSPixelLocalTrack>>(iConfig.getParameter<edm::InputTag>("tagPixelLocalTrack"))),
+  geomEsToken_(esConsumes<edm::Transition::BeginRun>()),
+  DiamondDet(iConfig,tokenRecHit_,tokenLocalTrack_),
+  validOOT(iConfig.getParameter<int>("tagValidOOT")){
+  
+  Ntracks_cuts_map_[std::make_pair(SECTOR_45_ID,STATION_210_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[0],
+																					 iConfig.getParameter< std::vector <int> >( "Ntracks_Ucuts" )[0]);
+	Ntracks_cuts_map_[std::make_pair(SECTOR_45_ID,STATION_220_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[1],
+																					 iConfig.getParameter< std::vector <int> >( "Ntracks_Ucuts" )[1]);
+	Ntracks_cuts_map_[std::make_pair(SECTOR_56_ID,STATION_210_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[2],
+																					 iConfig.getParameter< std::vector <int> >( "Ntracks_Ucuts" )[2]);
+	Ntracks_cuts_map_[std::make_pair(SECTOR_56_ID,STATION_220_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[3],
+																					 iConfig.getParameter< std::vector <int> >( "Ntracks_Ucuts" )[3]);
 }
 
 //
@@ -86,16 +133,89 @@ DiamondTimingWorker::DiamondTimingWorker(const edm::ParameterSet& iConfig)
 
 void DiamondTimingWorker::analyze(const edm::Event &iEvent,
                                   const edm::EventSetup &iSetup){
-  histos.histo_->Fill(1.);
+  using namespace edm;
+  
+  //retrieve data
+  edm::Handle< edm::DetSetVector<CTPPSDiamondRecHit> > timingRecHit;
+  edm::Handle< edm::DetSetVector<CTPPSPixelLocalTrack> > pixelLocalTrack;
+
+  iEvent.getByToken(tokenRecHit_, timingRecHit );
+  iEvent.getByToken(tokenPixelLocalTrack_, pixelLocalTrack );
+  
+
+  ////////////////////////////////////////////////////////////////
+  //
+  //		EXTRACT PIXELS TRACK NUMBER
+  //      Will be used for sector independent event selection
+  //
+  ///////////////////////////////////////////////////////////////// 
+  std::map< std::pair< int , int >, int> Pixel_Mux_map_; //arm, station
+  Pixel_Mux_map_.clear();
+  std::vector<bool> Sector_TBA(2,true);
+  
+  for(const auto& RP_trks : *pixelLocalTrack){ //array of tracks
+    const CTPPSDetId detId( RP_trks.detId() );
+	  //std::cout << "Tracks in arm " << detId.arm() << ", station " << detId.station() << ", rp " << detId.rp() << std::endl;
+      
+	  for(const auto& trk : RP_trks) {
+		  if(!trk.isValid()) continue;
+		    Pixel_Mux_map_[ std::make_pair(detId.arm(), detId.station()) ]++;
+    }	 
+	} 
+	
+  for (const auto& Ntracks_cuts_iter_ :  Ntracks_cuts_map_){
+    if((Ntracks_cuts_iter_.second.first < 0) || (Ntracks_cuts_iter_.second.second < 0)) continue; // don't care condition
+    if((Pixel_Mux_map_[Ntracks_cuts_iter_.first] < Ntracks_cuts_iter_.second.first) ||
+       (Pixel_Mux_map_[Ntracks_cuts_iter_.first] > Ntracks_cuts_iter_.second.second)) //condition violated
+      Sector_TBA[Ntracks_cuts_iter_.first.first] = false;
+  } 
+	
+  if(!(Sector_TBA[0] || Sector_TBA[1])) return;
+
+  
+  ////////////////////////////////////////////////////////////////
+  //
+  //		EXTRACT Dimoand detector info
+  //
+  ///////////////////////////////////////////////////////////////// 
+  DiamondDet.ExtractData(iEvent);
+ 
+
+  ////////////////////////////////////////////////////////////////
+  //
+  //		control over PCL calibration quality
+  //
+  /////////////////////////////////////////////////////////////////  
+  for (const auto& recHits : *timingRecHit){ //rechits = array of hits in one channel
+    const CTPPSDiamondDetId detId(recHits.detId());
+	  if(!(Sector_TBA[detId.arm()])) continue;
+	
+	  // Perform channel histogram
+    for (const auto& recHit : recHits){ //rechit
+		  //std::cout << "Hits in channel " << detId.channel() << ", plane " << detId.plane() << ", rp " << detId.rp()<< ", station " << detId.station()<< 
+	    //", arm " << detId.arm() << std::endl;
+
+		  if (((recHit.ootIndex() !=0) && validOOT != -1) || recHit.multipleHits()) 
+        continue;
+	
+      //T,TOT and OOT for all hits, important for monitoring the calibration	
+		  histos.t[detId.rawId()]-> Fill(recHit.time());
+		  histos.tot[detId.rawId()]-> Fill(recHit.toT());
+
+      // T,TOT and OOT complete hits (T and TOT available), important for monitoring the calibration
+      if(DiamondDet.PadActive(detId.arm(), detId.plane(),detId.channel())){
+        histos.valid_tot[detId.rawId()]-> Fill(DiamondDet.GetToT(detId.arm(), detId.plane(),detId.channel()));
+        histos.t_vs_tot[detId.rawId()]-> Fill(DiamondDet.GetToT(detId.arm(), detId.plane(),detId.channel()), DiamondDet.GetTime(detId.arm(), detId.plane(),detId.channel()));
+        histos.valid_t[detId.rawId()]-> Fill(DiamondDet.GetTime(detId.arm(), detId.plane(),detId.channel()));
+      }
+    }
+  }
 }
 
 
 void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
                                            edm::Run const& run,
                                            edm::EventSetup const& iSetup) {
-  
-  iBooker.setCurrentFolder(folder_);
-  histos.histo_ = iBooker.book1D("EXAMPLE", "EXAMPLE", 10, 0., 10.);
   
   std::string ch_name, ch_path;
   const auto& geom = iSetup.getData(geomEsToken_);
@@ -111,7 +231,7 @@ void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
     detid.channelName(ch_name);
     detid.channelName(ch_path, CTPPSDiamondDetId::nPath);
 
-    iBooker.setCurrentFolder(folder_ + "/" + ch_path);
+    iBooker.setCurrentFolder(ch_path);
     
     histos.t[detid.rawId()] = iBooker.book1D("t_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60., 60.);
     histos.tot[detid.rawId()] = iBooker.book1D("tot_" + ch_name, ch_name + ";ToT (ns);Entries", 100, -20., 20.);
