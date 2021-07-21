@@ -21,6 +21,7 @@
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "DQMServices/Core/interface/DQMEDAnalyzer.h"
+#include "DQMServices/Core/interface/MonitorElement.h"
 
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -42,16 +43,6 @@
 //
 // class declaration
 //
-
-struct Histograms_DiamondTiming {
-  dqm::reco::MonitorElement* histo_;
-  std::map<uint32_t, dqm::reco::MonitorElement*> t;
-  std::map<uint32_t, dqm::reco::MonitorElement*> valid_t;
-  std::map<uint32_t, dqm::reco::MonitorElement*> tot;
-  std::map<uint32_t, dqm::reco::MonitorElement*> valid_tot;
-  std::map<uint32_t, dqm::reco::MonitorElement*> t_vs_tot;
-};
-
 class DiamondTimingWorker : public DQMEDAnalyzer {
 public:
   explicit DiamondTimingWorker(const edm::ParameterSet&);
@@ -71,7 +62,15 @@ private:
   edm::ESGetToken<CTPPSGeometry, VeryForwardRealGeometryRecord> geomEsToken_;
 
   // ------------ member data ------------
+  struct Histograms_DiamondTiming {
+    std::map<uint32_t, MonitorElement*> t;
+    std::map<uint32_t, MonitorElement*> valid_t;
+    std::map<uint32_t, MonitorElement*> tot;
+    std::map<uint32_t, MonitorElement*> valid_tot;
+    std::map<uint32_t, MonitorElement*> t_vs_tot;
+  };
   Histograms_DiamondTiming histos;
+
   DiamondDetectorClass DiamondDet;
   int validOOT;
   std::map< std::pair< int , int >, std::pair< int , int > > Ntracks_cuts_map_; //arm, station ,, Lcut,Ucut
@@ -234,7 +233,9 @@ void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
     iBooker.setCurrentFolder(ch_path);
     
     histos.t[detid.rawId()] = iBooker.book1D("t_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60., 60.);
+    histos.valid_t[detid.rawId()] = iBooker.book1D("valid_t_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60., 60.);
     histos.tot[detid.rawId()] = iBooker.book1D("tot_" + ch_name, ch_name + ";ToT (ns);Entries", 100, -20., 20.);
+    histos.valid_tot[detid.rawId()] = iBooker.book1D("valid_tot_" + ch_name, ch_name + ";ToT (ns);Entries", 100, -20., 20.);
     histos.t_vs_tot[detid.rawId()] =
         iBooker.book2D("t_vs_tot_" + ch_name, ch_name + ";ToT (ns);t (ns)", 240, 0., 60., 450, -20., 25.);
   }
