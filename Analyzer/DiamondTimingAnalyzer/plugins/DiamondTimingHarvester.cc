@@ -25,8 +25,15 @@
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 
+#include "Geometry/VeryForwardGeometryBuilder/interface/CTPPSGeometry.h"
+#include "Geometry/Records/interface/VeryForwardRealGeometryRecord.h"
+#include "DataFormats/CTPPSDetId/interface/CTPPSDiamondDetId.h"
+
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 
+#include "DiamondDetectorClass.h"
+
+#include "TGraph.h"
 
 //
 // class declaration
@@ -45,6 +52,8 @@ private:
                  DQMStore::IGetter &iGetter,
                  edm::Run const &iRun,
                  edm::EventSetup const &iSetup) override;
+
+  edm::ESGetToken<CTPPSGeometry, VeryForwardRealGeometryRecord> geomEsToken_;
 };
 
 //
@@ -58,7 +67,8 @@ private:
 //
 // constructors and destructor
 //
-DiamondTimingHarvester::DiamondTimingHarvester(const edm::ParameterSet& iConfig){
+DiamondTimingHarvester::DiamondTimingHarvester(const edm::ParameterSet& iConfig)
+  : geomEsToken_(esConsumes<edm::Transition::EndRun>()){
   // now do what ever initialization is needed
 }
 
@@ -69,14 +79,53 @@ DiamondTimingHarvester::DiamondTimingHarvester(const edm::ParameterSet& iConfig)
 // ------------ method called for each event  ------------
 
 void DiamondTimingHarvester::dqmEndJob(DQMStore::IBooker &iBooker, DQMStore::IGetter &iGetter) {
-    std::cout<<"######## EndJob ########"<<std::endl;
+  std::cout<<"######## EndJob ########"<<std::endl;
 }
 
 void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
                DQMStore::IGetter &iGetter,
                edm::Run const &iRun,
                edm::EventSetup const &iSetup) {
-    std::cout<<"######## EndRun ########"<<std::endl;
+  
+  std::map<ChannelKey, double> Resolution_L2_map_;
+  
+  ///////////////////////////////////////////
+  // deriving full track based L2 resolution	
+  ///////////////////////////////////////////
+  std::string ch_name, ch_path;
+  const auto& geom = iSetup.getData(geomEsToken_);
+  for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
+    if (!CTPPSDiamondDetId::check(it->first))
+      continue;
+    
+    const CTPPSDiamondDetId detid(it->first);
+    int sec_id = detid.arm();
+    int pl_id = detid.plane();
+    int ch_id = detid.channel();
+    ChannelKey histo_key(sec_id,pl_id,ch_id);
+    detid.channelName(ch_name);
+    detid.channelName(ch_path, CTPPSDiamondDetId::nPath);
+
+    auto* l2_res = iGetter.get(ch_path + "/" + "l2_res_" + ch_name);
+    auto* expected_trk_time = iGetter.get(ch_path + "/" + "expected_trk_time_" + ch_name);
+		if(l2_res->getEntries() > 100){
+			l2_res->getTH1F()->Fit("gaus","+Q","",-10,10);
+			
+			if(l2_res->getTH1F()->GetFunction("gaus") != NULL){				
+				double ResL2_mean = l2_res->getTH1F()->GetFunction("gaus")->GetParameter(1);
+				double ResL2_sigma = l2_res->getTH1F()->GetFunction("gaus")->GetParameter(2);
+				l2_res->getTH1F()->Fit("gaus","","",ResL2_mean-(2.2*ResL2_sigma),ResL2_mean+(2.2*ResL2_sigma));
+				ResL2_sigma = l2_res->getTH1F()->GetFunction("gaus")->GetParameter(2);
+
+				double Exp_sigma = expected_trk_time->getTH1F()->GetMean();
+				if (ResL2_sigma > Exp_sigma)
+					Resolution_L2_map_[histo_key] = pow(pow(ResL2_sigma,2)-pow(Exp_sigma,2),0.5);
+				else
+					Resolution_L2_map_[histo_key] = 0.05;
+			}else
+				Resolution_L2_map_[histo_key] = 0.400;
+		}
+  }
 }
 
 // ------------ method fills 'descriptions' with the allowed parameters for the module  ------------

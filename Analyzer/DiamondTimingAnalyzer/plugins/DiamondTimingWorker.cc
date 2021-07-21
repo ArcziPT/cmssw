@@ -72,6 +72,11 @@ private:
     std::map<ChannelKey, MonitorElement*> l2_res;
     std::map<ChannelKey, MonitorElement*> trk_time;
     std::map<ChannelKey, MonitorElement*> expected_trk_time;
+
+    std::map<uint32_t, MonitorElement*> trk_time_SPC;
+	  std::map<uint32_t, MonitorElement*> trk_res;
+    std::map<uint32_t, MonitorElement*> trk_time_SPC_vs_BX;  //<sector>
+	  std::map<uint32_t, MonitorElement*> trk_time_SPC_vs_LS;  //<sector>
   };
   Histograms_DiamondTiming histos;
 
@@ -271,6 +276,12 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
 		  }
 		}
 
+    histos.trk_time_SPC[sec_number]->Fill(Track_time_SPC);
+	  histos.trk_res[sec_number]->Fill(Track_precision_SPC);
+	
+	  histos.trk_time_SPC_vs_BX[sec_number]->Fill(iEvent.bunchCrossing(), Track_time_SPC);  //<sector>
+	  histos.trk_time_SPC_vs_LS[sec_number]->Fill(iEvent.luminosityBlock(), Track_time_SPC);  //<sector>	
+
 	  if(mark_tag){
 		  for (int pl_mark = 0 ; pl_mark < PLANES_X_DETECTOR; pl_mark++){
 			  double Marked_track_time = 12.5;
@@ -326,6 +337,24 @@ void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
 
     // if(detid.station() != 1)
     //   continue;
+    if(histos.trk_time_SPC.count(detid.arm()) == 0){
+      std::string sec_path;
+      detid.armName(sec_path, CTPPSDiamondDetId::nPath);
+
+      iBooker.setCurrentFolder(sec_path);
+
+      std::string name = "Timing track time SPC sector " + std::to_string(detid.arm());
+      histos.trk_time_SPC[detid.arm()] = iBooker.book1D(name.c_str(), name.c_str(), 1200, -60, 60);
+
+      name = "Timing track resolution sector " + std::to_string(detid.arm());
+      histos.trk_res[detid.arm()] = iBooker.book1D(name.c_str(), name.c_str(), 1000, 0, 1);
+
+      name = "Timing track time SPC Vs BX sector " + std::to_string(detid.arm());
+      histos.trk_time_SPC_vs_BX[detid.arm()] = iBooker.book2D(name.c_str(), name.c_str(), 4000, 0, 4000, 500, -5 , 5 );
+
+      name = "Timing track time SPC Vs LS sector " + std::to_string(detid.arm());
+      histos.trk_time_SPC_vs_LS[detid.arm()] = iBooker.book2D(name.c_str(), name.c_str(), 4000, 0, 4000, 500, -5 , 5 );
+	  }
 
     detid.channelName(ch_name);
     detid.channelName(ch_path, CTPPSDiamondDetId::nPath);
