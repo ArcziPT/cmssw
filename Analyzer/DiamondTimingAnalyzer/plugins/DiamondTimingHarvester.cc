@@ -17,6 +17,7 @@
 //
 
 #include <string>
+#include <bitset>
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -35,6 +36,8 @@
 
 #include "CondFormats/PPSObjects/interface/PPSTimingCalibration.h"
 #include "CondFormats/DataRecord/interface/PPSTimingCalibrationRcd.h"
+
+#include "DiamondTimingCalibration.h"
 
 //
 // class declaration
@@ -134,13 +137,32 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
 		}
   }
 
-  std::cout<<"####### Calib #######"<<std::endl;
-  const auto& calib = iSetup.getData(calibEsToken_);
-  std::cout<<calib<<std::endl;
+  // std::cout<<"####### Calib #######"<<std::endl;
+  // const auto& calib = iSetup.getData(calibEsToken_);
+  // for(int sec=0; sec<2; sec++){
+  //   for(int st=0; st<1; st++){
+  //     for(int plane=0; plane<4; plane++){
+  //       for(int ch=0; ch<12; ch++){
+  //         std::cout<<"("<<sec<<", "<<st<<", "<<plane<<", "<<ch<<")"<<" = "<<calib.timePrecision(sec, st, plane, ch)<<std::endl;
+  //       }
+  //     }
+  //   }
+  // }
+  // DiamondTimingCalibration c(calib);
+  // std::cout<<c<<std::endl;
+
+  // const auto& geom = iSetup.getData(geomEsToken_);
+  // for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
+  //   if (!CTPPSDiamondDetId::check(it->first))
+  //     continue;
+
+  //   CTPPSDiamondDetId id((*it).first);
+  //   std::cout<<id.arm()<<", "<<id.station()<<", "<<id.plane()<<", "<<id.channel()<<std::endl;
+  // }
 
   iBooker.setCurrentFolder("/");
   for(auto e : Resolution_L2_map_){
-    auto* mEl = iBooker.book1D("res_" + std::to_string(e.first.sector) + "_" + std::to_string(e.first.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -60., 60.);
+    auto* mEl = iBooker.book1D("res_" + std::to_string(e.first.planeKey.sector) + "_" + std::to_string(e.first.planeKey.station) + "_" + std::to_string(e.first.planeKey.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -60., 60.);
     mEl->Fill(e.second);
   }
 }

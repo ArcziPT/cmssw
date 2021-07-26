@@ -38,6 +38,9 @@
 #include "DataFormats/CTPPSReco/interface/CTPPSDiamondLocalTrack.h"
 
 #include "DataFormats/CTPPSReco/interface/CTPPSPixelLocalTrack.h"
+
+#include "CondFormats/DataRecord/interface/PPSTimingCalibrationRcd.h"
+
 #include "DiamondDetectorClass.h"
 
 //
@@ -60,27 +63,29 @@ private:
   edm::EDGetTokenT<edm::DetSetVector<CTPPSDiamondLocalTrack>> tokenLocalTrack_;
   edm::EDGetTokenT<edm::DetSetVector<CTPPSPixelLocalTrack>> tokenPixelLocalTrack_;
   edm::ESGetToken<CTPPSGeometry, VeryForwardRealGeometryRecord> geomEsToken_;
+  edm::ESGetToken<PPSTimingCalibration, PPSTimingCalibrationRcd> calibEsToken_;
 
   // ------------ member data ------------
   struct Histograms_DiamondTiming {
-    std::map<uint32_t, MonitorElement*> t;
-    std::map<uint32_t, MonitorElement*> valid_t;
-    std::map<uint32_t, MonitorElement*> tot;
-    std::map<uint32_t, MonitorElement*> valid_tot;
-    std::map<uint32_t, MonitorElement*> t_vs_tot;
+    std::map<ChannelKey, MonitorElement*> t;
+    std::map<ChannelKey, MonitorElement*> valid_t;
+    std::map<ChannelKey, MonitorElement*> tot;
+    std::map<ChannelKey, MonitorElement*> valid_tot;
+    std::map<ChannelKey, MonitorElement*> t_vs_tot;
 
     std::map<ChannelKey, MonitorElement*> l2_res;
     std::map<ChannelKey, MonitorElement*> trk_time;
     std::map<ChannelKey, MonitorElement*> expected_trk_time_res;
 
-    std::map<uint32_t, MonitorElement*> trk_time_SPC;
-	  std::map<uint32_t, MonitorElement*> trk_res;
-    std::map<uint32_t, MonitorElement*> trk_time_SPC_vs_BX;  //<sector>
-	  std::map<uint32_t, MonitorElement*> trk_time_SPC_vs_LS;  //<sector>
+    std::map<std::pair<int, int>, MonitorElement*> trk_time_SPC;
+	  std::map<std::pair<int, int>, MonitorElement*> trk_res;
+    std::map<std::pair<int, int>, MonitorElement*> trk_time_SPC_vs_BX;  //<sector>
+	  std::map<std::pair<int, int>, MonitorElement*> trk_time_SPC_vs_LS;  //<sector>
   };
   Histograms_DiamondTiming histos;
 
-  DiamondDetectorClass DiamondDet;
+  edm::ESHandle<CTPPSGeometry> geom;
+  edm::ESHandle<PPSTimingCalibration> calib;
   int validOOT;
   std::map< std::pair< int , int >, std::pair< int , int > > Ntracks_cuts_map_; //arm, station ,, Lcut,Ucut
 };
@@ -88,30 +93,14 @@ private:
 //
 // constants, enums and typedefs
 //
-  enum Sector_id_{
-		SECTOR_45_ID,
-		SECTOR_56_ID
-  };
 	  
-	enum Plane_id_{
-		PLANE_0_ID,
-		PLANE_1_ID,
-		PLANE_2_ID,
-		PLANE_3_ID
-	};
-	  
-	enum Station_id_{
-		STATION_210_M_ID,
-		STATION_TIMING_ID,
-		STATION_220_M_ID
-  };
+enum STATION{
+	_210_M_ID,
+  _TIMING_ID,
+	_220_M_ID
+};
 
-//
-// static data member definitions
-//
-  static const int CHANNELS_X_PLANE  = 12;
-  static const int PLANES_X_DETECTOR = 4;
-  static const int MAX_SECTOR_NUMBER = 2;
+const int PLANES_X_DETECTOR = 4;
 
 //
 // constructors and destructor
@@ -123,16 +112,16 @@ DiamondTimingWorker::DiamondTimingWorker(const edm::ParameterSet& iConfig)
   tokenLocalTrack_(consumes<edm::DetSetVector<CTPPSDiamondLocalTrack>>(iConfig.getParameter<edm::InputTag>("tagLocalTrack"))),
   tokenPixelLocalTrack_(consumes<edm::DetSetVector<CTPPSPixelLocalTrack>>(iConfig.getParameter<edm::InputTag>("tagPixelLocalTrack"))),
   geomEsToken_(esConsumes<edm::Transition::BeginRun>()),
-  DiamondDet(iConfig,tokenRecHit_,tokenLocalTrack_),
+  calibEsToken_(esConsumes<edm::Transition::BeginRun>()),
   validOOT(iConfig.getParameter<int>("tagValidOOT")){
   
-  Ntracks_cuts_map_[std::make_pair(SECTOR_45_ID,STATION_210_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[0],
+  Ntracks_cuts_map_[std::make_pair(SECTOR::_45_ID, STATION::_210_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[0],
 																					 iConfig.getParameter< std::vector <int> >( "Ntracks_Ucuts" )[0]);
-	Ntracks_cuts_map_[std::make_pair(SECTOR_45_ID,STATION_220_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[1],
+	Ntracks_cuts_map_[std::make_pair(SECTOR::_45_ID, STATION::_220_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[1],
 																					 iConfig.getParameter< std::vector <int> >( "Ntracks_Ucuts" )[1]);
-	Ntracks_cuts_map_[std::make_pair(SECTOR_56_ID,STATION_210_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[2],
+	Ntracks_cuts_map_[std::make_pair(SECTOR::_56_ID, STATION::_210_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[2],
 																					 iConfig.getParameter< std::vector <int> >( "Ntracks_Ucuts" )[2]);
-	Ntracks_cuts_map_[std::make_pair(SECTOR_56_ID,STATION_220_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[3],
+	Ntracks_cuts_map_[std::make_pair(SECTOR::_56_ID, STATION::_220_M_ID)] = std::make_pair(iConfig.getParameter< std::vector <int> >( "Ntracks_Lcuts" )[3],
 																					 iConfig.getParameter< std::vector <int> >( "Ntracks_Ucuts" )[3]);
 }
 
@@ -147,11 +136,19 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
   using namespace edm;
   
   //retrieve data
-  edm::Handle< edm::DetSetVector<CTPPSDiamondRecHit> > timingRecHit;
-  edm::Handle< edm::DetSetVector<CTPPSPixelLocalTrack> > pixelLocalTrack;
+  edm::Handle<edm::DetSetVector<CTPPSDiamondRecHit>> recHits;
+  edm::Handle<edm::DetSetVector<CTPPSDiamondLocalTrack>> localTracks;
+  edm::Handle<edm::DetSetVector<CTPPSPixelLocalTrack>> pixelLocalTracks;
 
-  iEvent.getByToken(tokenRecHit_, timingRecHit );
-  iEvent.getByToken(tokenPixelLocalTrack_, pixelLocalTrack );
+  iEvent.getByToken(tokenRecHit_, recHits);
+  iEvent.getByToken(tokenLocalTrack_, localTracks);
+  iEvent.getByToken(tokenPixelLocalTrack_, pixelLocalTracks);
+
+  DiamondDetectorClass DiamondDet(validOOT,
+    *geom,
+    *recHits,
+    *localTracks,
+    DiamondTimingCalibration(*calib));
   
 
   ////////////////////////////////////////////////////////////////
@@ -160,17 +157,17 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
   //      Will be used for sector independent event selection
   //
   ///////////////////////////////////////////////////////////////// 
-  std::map< std::pair< int , int >, int> Pixel_Mux_map_; //arm, station
+  std::map<std::pair<int, int>, int> Pixel_Mux_map_; //arm, station
   Pixel_Mux_map_.clear();
-  std::vector<bool> Sector_TBA(2,true);
+  std::vector<bool> Sector_TBA(2, true);
   
-  for(const auto& RP_trks : *pixelLocalTrack){ //array of tracks
-    const CTPPSDetId detId( RP_trks.detId() );
+  for(const auto& RP_trks : *pixelLocalTracks){ //array of tracks
+    const CTPPSDetId detId(RP_trks.detId());
 	  //std::cout << "Tracks in arm " << detId.arm() << ", station " << detId.station() << ", rp " << detId.rp() << std::endl;
       
 	  for(const auto& trk : RP_trks) {
 		  if(!trk.isValid()) continue;
-		    Pixel_Mux_map_[ std::make_pair(detId.arm(), detId.station()) ]++;
+		    Pixel_Mux_map_[std::make_pair(detId.arm(), detId.station())]++;
     }	 
 	} 
 	
@@ -183,41 +180,30 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
 	
   if(!(Sector_TBA[0] || Sector_TBA[1])) return;
 
-  
-  ////////////////////////////////////////////////////////////////
-  //
-  //		EXTRACT Dimoand detector info
-  //
-  ///////////////////////////////////////////////////////////////// 
-  DiamondDet.ExtractData(iEvent);
- 
-
   ////////////////////////////////////////////////////////////////
   //
   //		control over PCL calibration quality
   //
-  /////////////////////////////////////////////////////////////////  
-  for (const auto& recHits : *timingRecHit){ //rechits = array of hits in one channel
-    const CTPPSDiamondDetId detid(recHits.detId());
+  /////////////////////////////////////////////////////////////////
+  for (const auto& _recHits : *recHits){ //rechits = array of hits in one channel
+    const CTPPSDiamondDetId detid(_recHits.detId());
+    const ChannelKey key(detid);
 	  if(!(Sector_TBA[detid.arm()])) continue;
 	
 	  // Perform channel histogram
-    for (const auto& recHit : recHits){ //rechit
-		  //std::cout << "Hits in channel " << detId.channel() << ", plane " << detId.plane() << ", rp " << detId.rp()<< ", station " << detId.station()<< 
-	    //", arm " << detId.arm() << std::endl;
-
+    for (const auto& recHit : _recHits){ //rechit
 		  if (((recHit.ootIndex() !=0) && validOOT != -1) || recHit.multipleHits()) 
         continue;
-	
+
       //T,TOT and OOT for all hits, important for monitoring the calibration	
-		  histos.t[detid.rawId()]-> Fill(recHit.time());
-		  histos.tot[detid.rawId()]-> Fill(recHit.toT());
+		  histos.t[key]->Fill(recHit.time());
+		  histos.tot[key]->Fill(recHit.toT());
 
       // T,TOT and OOT complete hits (T and TOT available), important for monitoring the calibration
-      if(DiamondDet.PadActive(detid.arm(), detid.plane(), detid.channel())){
-        histos.valid_tot[detid.rawId()]-> Fill(DiamondDet.GetToT(detid.arm(), detid.plane(),detid.channel()));
-        histos.t_vs_tot[detid.rawId()]-> Fill(DiamondDet.GetToT(detid.arm(), detid.plane(),detid.channel()), DiamondDet.GetTime(detid.arm(), detid.plane(),detid.channel()));
-        histos.valid_t[detid.rawId()]-> Fill(DiamondDet.GetTime(detid.arm(), detid.plane(),detid.channel()));
+      if(DiamondDet.PadActive(key)){
+        histos.valid_tot[key]-> Fill(DiamondDet.GetToT(key));
+        histos.t_vs_tot[key]-> Fill(DiamondDet.GetToT(key), DiamondDet.GetTime(key));
+        histos.valid_t[key]-> Fill(DiamondDet.GetTime(key));
       }
     }
   }
@@ -237,35 +223,40 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
   ///////////////////////////////////////////////////////////////// 
 
   for (const auto& LocalTrack_mapIter : DiamondDet.GetDiamondTrack_map()){ // loop on predigested tracks
-	  int sec_number = LocalTrack_mapIter.first.z0() > 0.0 ? SECTOR_45_ID : SECTOR_56_ID;
+	  int sector = LocalTrack_mapIter.first.z0() > 0.0 ? SECTOR::_45_ID : SECTOR::_56_ID;
     
-    if(!(Sector_TBA[sec_number])) 
+    if(!(Sector_TBA[sector])) 
       continue;
 
     if(LocalTrack_mapIter.second.size() == 0) 
       continue;
 
-    bool mark_tag = DiamondDet.GetMuxInTrack(sec_number, PLANE_0_ID) == 1 && 
-                    DiamondDet.GetMuxInTrack(sec_number, PLANE_1_ID) == 1 && 
-                    DiamondDet.GetMuxInTrack(sec_number, PLANE_2_ID) == 1 && 
-                    DiamondDet.GetMuxInTrack(sec_number, PLANE_3_ID) == 1 &&
-                    DiamondDet.GetTrackMuxInSector(sec_number) == 1;
+    int station = LocalTrack_mapIter.second.at(0).first.planeKey.station;
+    auto stationKey = std::pair<int ,int>{sector, station};
+
+    bool mark_tag = DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 0)) == 1 && 
+                    DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 1)) == 1 && 
+                    DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 2)) == 1 && 
+                    DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 3)) == 1 &&
+                    DiamondDet.GetTrackMuxInSector(sector) == 1;
 	
-	  std::vector<ChannelKey> hit_selected(4);
+	  std::vector<ChannelKey> hit_selected(PLANES_X_DETECTOR);
 	  std::vector<std::pair<ChannelKey,CTPPSDiamondRecHit>>::const_iterator hit_iter;
 	
 	  double Track_time_SPC = 100.0;
 	  double Track_precision_SPC = 100.0;
 
     // hits in track loop LocalTrack_mapIter.second = std::vector<std::pair<ChannelKey,CTPPSDiamondRecHit>>
-	  for(hit_iter = LocalTrack_mapIter.second.begin(); hit_iter < LocalTrack_mapIter.second.end(); hit_iter++){ 
-	    //std::cout << "looping on hits" << std::endl;
-		  double hit_time_SPC= DiamondDet.GetTime((*hit_iter).first.sector,(*hit_iter).first.plane,(*hit_iter).first.channel);
-		  double hit_prec_SPC= DiamondDet.GetPadPrecision((*hit_iter).first.sector,(*hit_iter).first.plane,(*hit_iter).first.channel);
-		  double hit_weig_SPC= DiamondDet.GetPadWeight((*hit_iter).first.sector,(*hit_iter).first.plane,(*hit_iter).first.channel);
+	  for(hit_iter = LocalTrack_mapIter.second.begin(); hit_iter < LocalTrack_mapIter.second.end(); hit_iter++){
+      auto& key = (*hit_iter).first;
+
+		  double hit_time_SPC = DiamondDet.GetTime(key);
+		  double hit_prec_SPC = DiamondDet.GetPadPrecision(key);
+		  double hit_weig_SPC = DiamondDet.GetPadWeight(key);
+      //std::cout<<hit_time_SPC<<", "<<hit_prec_SPC<<", "<<hit_weig_SPC<<std::endl;
 		
-		  if (mark_tag)
-				hit_selected[(*hit_iter).first.plane] = (*hit_iter).first;  // save for resolution reco
+		  if(mark_tag)
+				hit_selected[(*hit_iter).first.planeKey.plane] = (*hit_iter).first;  // save for resolution reco
 		
 		  if(hit_iter == LocalTrack_mapIter.second.begin()){
 			  Track_time_SPC = hit_time_SPC;
@@ -276,30 +267,31 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
 		  }
 		}
 
-    histos.trk_time_SPC[sec_number]->Fill(Track_time_SPC);
-	  histos.trk_res[sec_number]->Fill(Track_precision_SPC);
+    //std::cout<<"ADD STATION"<<std::endl;
+    histos.trk_time_SPC[stationKey]->Fill(Track_time_SPC);
+	  histos.trk_res[stationKey]->Fill(Track_precision_SPC);
 	
-	  histos.trk_time_SPC_vs_BX[sec_number]->Fill(iEvent.bunchCrossing(), Track_time_SPC);  //<sector>
-	  histos.trk_time_SPC_vs_LS[sec_number]->Fill(iEvent.luminosityBlock(), Track_time_SPC);  //<sector>	
+	  histos.trk_time_SPC_vs_BX[stationKey]->Fill(iEvent.bunchCrossing(), Track_time_SPC);  //<sector>
+	  histos.trk_time_SPC_vs_LS[stationKey]->Fill(iEvent.luminosityBlock(), Track_time_SPC);  //<sector>	
 
 	  if(mark_tag){
-		  for (int pl_mark = 0 ; pl_mark < PLANES_X_DETECTOR; pl_mark++){
+		  for(int pl_mark = 0 ; pl_mark < PLANES_X_DETECTOR; pl_mark++){
 			  double Marked_track_time = 12.5;
 			  double Marked_track_precision = 25.0;
-			  double Marked_hit_time=0.0;
-			  int Marked_hit_channel=-1;
+			  double Marked_hit_time = 0.0;
+			  int Marked_hit_channel = -1;
 			
         bool first = true;
-			  for (int pl_loop = 0 ; pl_loop < PLANES_X_DETECTOR; pl_loop++){
+			  for(int pl_loop = 0 ; pl_loop < PLANES_X_DETECTOR; pl_loop++){
 				  if (pl_loop == pl_mark){
-					  Marked_hit_time = DiamondDet.GetTime(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
+					  Marked_hit_time = DiamondDet.GetTime(hit_selected[pl_loop]);
 					  Marked_hit_channel = hit_selected[pl_loop].channel;
             continue;
 				  }
 
-				  double Others_hit_time = DiamondDet.GetTime(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
-				  double Others_hit_prec = DiamondDet.GetPadPrecision(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
-				  double Others_hit_weig = DiamondDet.GetPadWeight(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
+				  double Others_hit_time = DiamondDet.GetTime(hit_selected[pl_loop]);
+				  double Others_hit_prec = DiamondDet.GetPadPrecision(hit_selected[pl_loop]);
+				  double Others_hit_weig = DiamondDet.GetPadWeight(hit_selected[pl_loop]);
 				 
           //the previous one: hit_iter == LocalTrack_mapIter.second.begin() was always false
 			    if(first){
@@ -315,7 +307,7 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
         //std::cout<<"T = "<<Marked_hit_time<<"; Trk = "<<Marked_track_time<<std::endl;
 			  double Marked_hit_difference = Marked_hit_time-Marked_track_time;
 
-        ChannelKey key(sec_number, pl_mark, Marked_hit_channel);
+        ChannelKey key(sector, station, pl_mark, Marked_hit_channel);
 
         histos.l2_res[key]-> Fill(Marked_hit_difference);
 			  histos.trk_time[key]-> Fill(Marked_track_time);
@@ -327,12 +319,13 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
 
 
 void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
-                                           edm::Run const& run,
-                                           edm::EventSetup const& iSetup) {
-  
+                                         edm::Run const& run,
+                                         edm::EventSetup const& iSetup) {
+  calib = iSetup.getHandle(calibEsToken_);
+
   std::string ch_name, ch_path;
-  const auto& geom = iSetup.getData(geomEsToken_);
-  for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
+  geom = iSetup.getHandle(geomEsToken_);
+  for (auto it = (*geom).beginSensor(); it != (*geom).endSensor(); ++it) {
     if (!CTPPSDiamondDetId::check(it->first))
       continue;
     
@@ -341,23 +334,25 @@ void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
 
     // if(detid.station() != 1)
     //   continue;
-    if(histos.trk_time_SPC.count(detid.arm()) == 0){
-      std::string sec_path;
-      detid.armName(sec_path, CTPPSDiamondDetId::nPath);
+    if(histos.trk_time_SPC.count({detid.arm(), detid.station()}) == 0){
+      std::string station_path;
+      detid.stationName(station_path, CTPPSDiamondDetId::nPath);
 
-      iBooker.setCurrentFolder(sec_path);
+      iBooker.setCurrentFolder(station_path);
+
+      auto stationKey = std::make_pair<int, int>(detid.arm(), detid.station());
 
       std::string name = "Timing track time SPC sector " + std::to_string(detid.arm());
-      histos.trk_time_SPC[detid.arm()] = iBooker.book1D(name.c_str(), name.c_str(), 1200, -60, 60);
+      histos.trk_time_SPC[stationKey] = iBooker.book1D(name.c_str(), name.c_str(), 1200, -60, 60);
 
       name = "Timing track resolution sector " + std::to_string(detid.arm());
-      histos.trk_res[detid.arm()] = iBooker.book1D(name.c_str(), name.c_str(), 1000, 0, 1);
+      histos.trk_res[stationKey] = iBooker.book1D(name.c_str(), name.c_str(), 1000, 0, 1);
 
       name = "Timing track time SPC Vs BX sector " + std::to_string(detid.arm());
-      histos.trk_time_SPC_vs_BX[detid.arm()] = iBooker.book2D(name.c_str(), name.c_str(), 4000, 0, 4000, 500, -5 , 5 );
+      histos.trk_time_SPC_vs_BX[stationKey] = iBooker.book2D(name.c_str(), name.c_str(), 4000, 0, 4000, 500, -5 , 5 );
 
       name = "Timing track time SPC Vs LS sector " + std::to_string(detid.arm());
-      histos.trk_time_SPC_vs_LS[detid.arm()] = iBooker.book2D(name.c_str(), name.c_str(), 4000, 0, 4000, 500, -5 , 5 );
+      histos.trk_time_SPC_vs_LS[stationKey] = iBooker.book2D(name.c_str(), name.c_str(), 4000, 0, 4000, 500, -5 , 5 );
 	  }
 
     detid.channelName(ch_name);
@@ -365,11 +360,11 @@ void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
 
     iBooker.setCurrentFolder(ch_path);
     
-    histos.t[detid.rawId()] = iBooker.book1D("t_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60., 60.);
-    histos.valid_t[detid.rawId()] = iBooker.book1D("valid_t_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60., 60.);
-    histos.tot[detid.rawId()] = iBooker.book1D("tot_" + ch_name, ch_name + ";ToT (ns);Entries", 100, -20., 20.);
-    histos.valid_tot[detid.rawId()] = iBooker.book1D("valid_tot_" + ch_name, ch_name + ";ToT (ns);Entries", 100, -20., 20.);
-    histos.t_vs_tot[detid.rawId()] =
+    histos.t[key] = iBooker.book1D("t_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60., 60.);
+    histos.valid_t[key] = iBooker.book1D("valid_t_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60., 60.);
+    histos.tot[key] = iBooker.book1D("tot_" + ch_name, ch_name + ";ToT (ns);Entries", 100, -20., 20.);
+    histos.valid_tot[key] = iBooker.book1D("valid_tot_" + ch_name, ch_name + ";ToT (ns);Entries", 100, -20., 20.);
+    histos.t_vs_tot[key] =
         iBooker.book2D("t_vs_tot_" + ch_name, ch_name + ";ToT (ns);t (ns)", 240, 0., 60., 450, -20., 25.);
 
     //TODO
