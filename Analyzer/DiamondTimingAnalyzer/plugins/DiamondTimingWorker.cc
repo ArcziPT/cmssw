@@ -289,18 +289,21 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
 			  double Marked_hit_time=0.0;
 			  int Marked_hit_channel=-1;
 			
+        bool first = true;
 			  for (int pl_loop = 0 ; pl_loop < PLANES_X_DETECTOR; pl_loop++){
 				  if (pl_loop == pl_mark){
 					  Marked_hit_time = DiamondDet.GetTime(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
 					  Marked_hit_channel = hit_selected[pl_loop].channel;
-					  continue;
+            continue;
 				  }
 
 				  double Others_hit_time = DiamondDet.GetTime(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
 				  double Others_hit_prec = DiamondDet.GetPadPrecision(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
 				  double Others_hit_weig = DiamondDet.GetPadWeight(hit_selected[pl_loop].sector,hit_selected[pl_loop].plane,hit_selected[pl_loop].channel);
 				 
-			    if (hit_iter == LocalTrack_mapIter.second.begin()){
+          //the previous one: hit_iter == LocalTrack_mapIter.second.begin() was always false
+			    if(first){
+            first = false;
 					  Marked_track_time = Others_hit_time;
 					  Marked_track_precision = Others_hit_prec;
           }else{	
@@ -309,6 +312,7 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
 				  }
 			  }
 			
+        //std::cout<<"T = "<<Marked_hit_time<<"; Trk = "<<Marked_track_time<<std::endl;
 			  double Marked_hit_difference = Marked_hit_time-Marked_track_time;
 
         ChannelKey key(sec_number, pl_mark, Marked_hit_channel);
@@ -368,9 +372,10 @@ void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
     histos.t_vs_tot[detid.rawId()] =
         iBooker.book2D("t_vs_tot_" + ch_name, ch_name + ";ToT (ns);t (ns)", 240, 0., 60., 450, -20., 25.);
 
-		histos.l2_res[key] = iBooker.book1D("l2_res_" + ch_name, ch_name + ";x;y", 1200, -60, 60 );
-		histos.trk_time[key] = iBooker.book1D("trk_time_" + ch_name, ch_name + ";x;y", 1200, -60, 60 );		
-		histos.expected_trk_time[key] = iBooker.book1D("expected_trk_time_" + ch_name, ch_name + ";x;y", 1000, 0, 2 );		
+    //TODO
+		histos.l2_res[key] = iBooker.book1D("l2_res_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60, 60 );
+		histos.trk_time[key] = iBooker.book1D("trk_time_" + ch_name, ch_name + ";t (ns);Entries", 1200, -60, 60 );		
+		histos.expected_trk_time_res[key] = iBooker.book1D("expected_trk_time_res_" + ch_name, ch_name + ";t (ns);Entries", 1000, 0, 2 );		
   }
 }
 
