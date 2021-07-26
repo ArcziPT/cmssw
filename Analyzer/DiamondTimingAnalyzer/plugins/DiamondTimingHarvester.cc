@@ -33,7 +33,8 @@
 
 #include "DiamondDetectorClass.h"
 
-#include "TGraph.h"
+#include "CondFormats/PPSObjects/interface/PPSTimingCalibration.h"
+#include "CondFormats/DataRecord/interface/PPSTimingCalibrationRcd.h"
 
 //
 // class declaration
@@ -54,6 +55,7 @@ private:
                  edm::EventSetup const &iSetup) override;
 
   edm::ESGetToken<CTPPSGeometry, VeryForwardRealGeometryRecord> geomEsToken_;
+  edm::ESGetToken<PPSTimingCalibration, PPSTimingCalibrationRcd> calibEsToken_;
 };
 
 //
@@ -68,7 +70,10 @@ private:
 // constructors and destructor
 //
 DiamondTimingHarvester::DiamondTimingHarvester(const edm::ParameterSet& iConfig)
-  : geomEsToken_(esConsumes<edm::Transition::EndRun>()){
+  : 
+  geomEsToken_(esConsumes<edm::Transition::EndRun>()),
+  calibEsToken_(esConsumes<edm::Transition::EndRun>())
+  {
   // now do what ever initialization is needed
 }
 
@@ -92,6 +97,8 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
   ///////////////////////////////////////////
   // deriving full track based L2 resolution	
   ///////////////////////////////////////////
+  std::cout<<"####### EndRun #######"<<std::endl;
+
   std::string ch_name, ch_path;
   const auto& geom = iSetup.getData(geomEsToken_);
   for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
@@ -107,7 +114,7 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
     detid.channelName(ch_path, CTPPSDiamondDetId::nPath);
 
     auto* l2_res = iGetter.get(ch_path + "/" + "l2_res_" + ch_name);
-    auto* expected_trk_time = iGetter.get(ch_path + "/" + "expected_trk_time_" + ch_name);
+    auto* expected_trk_time = iGetter.get(ch_path + "/" + "expected_trk_time_res_" + ch_name);
 		if(l2_res->getEntries() > 100){
 			l2_res->getTH1F()->Fit("gaus","+Q","",-10,10);
 			
@@ -125,6 +132,16 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
 			}else
 				Resolution_L2_map_[histo_key] = 0.400;
 		}
+  }
+
+  std::cout<<"####### Calib #######"<<std::endl;
+  const auto& calib = iSetup.getData(calibEsToken_);
+  std::cout<<calib<<std::endl;
+
+  iBooker.setCurrentFolder("/");
+  for(auto e : Resolution_L2_map_){
+    auto* mEl = iBooker.book1D("res_" + std::to_string(e.first.sector) + "_" + std::to_string(e.first.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -60., 60.);
+    mEl->Fill(e.second);
   }
 }
 

@@ -60,7 +60,7 @@ process.source = cms.Source("PoolSource",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/002EF773-026C-2C49-981E-602DC3F43DF5.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/01BDECC6-EDA1-A141-94C7-2BC88B97A586.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/027CA2FB-8559-FF47-9026-E3A716F7569C.root",
-    "/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/038AE40E-E498-0E46-AE33-E396FCA00136.root",
+    #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/038AE40E-E498-0E46-AE33-E396FCA00136.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/04E49D12-050E-2243-AEE5-77EA9CEED5F7.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/054E7E4C-A75A-0E45-A4C7-07F328D9C0BB.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/07AC3C61-0EF7-A14F-AB4C-84A61E888B6C.root",
@@ -196,7 +196,7 @@ process.source = cms.Source("PoolSource",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/D635D5F6-798F-C045-A6A7-DA0FDFF72708.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/D6C1D7F2-6930-6244-B66D-A5CAAAC16651.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/D6D9BACA-9BEB-014B-9B2F-EACC8695E1FD.root",
-    #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/D7A0F357-9CB3-0142-817F-45C80A9C67FD.root",
+    "/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/D7A0F357-9CB3-0142-817F-45C80A9C67FD.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/D7F25FA3-05E1-A240-87BB-44CCE41707C3.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/DA193752-B3D8-FE4E-BD1D-55D26F74F1CC.root",
     #"/store/data/Run2018D/ZeroBias/AOD/12Nov2019_UL2018_rsb-v1/280000/DA302C5C-DF22-074F-9D24-33B745C70675.root",
@@ -240,6 +240,11 @@ process.load('RecoPPS.Local.ctppsDiamondLocalReconstruction_cff')
 
 process.load('Analyzer.DiamondTimingAnalyzer.diamond_timing_worker_cfi')
 process.load('Analyzer.DiamondTimingAnalyzer.diamond_timing_harvester_cfi')
+process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
+  calibrationFile = cms.FileInPath('DiamondCalibration.json'),
+  subDetector = cms.uint32(2),
+  appendToDataLabel = cms.string('')
+)
 
 process.TFileService = cms.Service("TFileService",
     fileName = cms.string(options.outputFile)

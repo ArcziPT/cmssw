@@ -71,7 +71,7 @@ private:
 
     std::map<ChannelKey, MonitorElement*> l2_res;
     std::map<ChannelKey, MonitorElement*> trk_time;
-    std::map<ChannelKey, MonitorElement*> expected_trk_time;
+    std::map<ChannelKey, MonitorElement*> expected_trk_time_res;
 
     std::map<uint32_t, MonitorElement*> trk_time_SPC;
 	  std::map<uint32_t, MonitorElement*> trk_res;
@@ -319,7 +319,7 @@ void DiamondTimingWorker::analyze(const edm::Event &iEvent,
 
         histos.l2_res[key]-> Fill(Marked_hit_difference);
 			  histos.trk_time[key]-> Fill(Marked_track_time);
-			  histos.expected_trk_time[key]-> Fill(Marked_track_precision);
+			  histos.expected_trk_time_res[key]-> Fill(Marked_track_precision);
 		  }
 	  }
   }
