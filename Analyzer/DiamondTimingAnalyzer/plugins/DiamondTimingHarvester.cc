@@ -38,6 +38,7 @@
 #include "CondFormats/DataRecord/interface/PPSTimingCalibrationRcd.h"
 
 #include "DiamondTimingCalibration.h"
+#include "JSONProducer.h"
 
 //
 // class declaration
@@ -104,15 +105,13 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
 
   std::string ch_name, ch_path;
   const auto& geom = iSetup.getData(geomEsToken_);
+  const auto& calib = DiamondTimingCalibration(iSetup.getData(calibEsToken_));
   for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
     if (!CTPPSDiamondDetId::check(it->first))
       continue;
     
     const CTPPSDiamondDetId detid(it->first);
-    int sec_id = detid.arm();
-    int pl_id = detid.plane();
-    int ch_id = detid.channel();
-    ChannelKey histo_key(sec_id,pl_id,ch_id);
+    ChannelKey histo_key(detid);
     detid.channelName(ch_name);
     detid.channelName(ch_path, CTPPSDiamondDetId::nPath);
 
@@ -129,12 +128,13 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
 
 				double Exp_sigma = expected_trk_time->getTH1F()->GetMean();
 				if (ResL2_sigma > Exp_sigma)
-					Resolution_L2_map_[histo_key] = pow(pow(ResL2_sigma,2)-pow(Exp_sigma,2),0.5);
+					Resolution_L2_map_[histo_key] = pow(pow(ResL2_sigma,2)-pow(Exp_sigma,2), 0.5)*1000;
 				else
-					Resolution_L2_map_[histo_key] = 0.05;
+					Resolution_L2_map_[histo_key] = 50;
 			}else
-				Resolution_L2_map_[histo_key] = 0.400;
-		}
+				Resolution_L2_map_[histo_key] = 400;
+		}else
+      Resolution_L2_map_[histo_key] = calib.timePrecision(histo_key);
   }
 
   // std::cout<<"####### Calib #######"<<std::endl;
@@ -165,6 +165,8 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
     auto* mEl = iBooker.book1D("res_" + std::to_string(e.first.planeKey.sector) + "_" + std::to_string(e.first.planeKey.station) + "_" + std::to_string(e.first.planeKey.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -60., 60.);
     mEl->Fill(e.second);
   }
+
+  JSON::save(geom, calib, Resolution_L2_map_, "DiamondCalibrationOut.json");
 }
 
 // ------------ method fills 'descriptions' with the allowed parameters for the module  ------------
