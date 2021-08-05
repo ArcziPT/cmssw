@@ -4,11 +4,10 @@
 
 namespace pt = boost::property_tree;
 
-DiamondDetectorClass::DiamondDetectorClass(
-	int validOOT,
-	const CTPPSGeometry& geom,
-	edm::DetSetVector<CTPPSDiamondRecHit> recHits, 
-	edm::DetSetVector<CTPPSDiamondLocalTrack> localTracks,
+DiamondDetectorClass::DiamondDetectorClass(int validOOT,
+	const CTPPSGeometry& geom, 
+	const edm::DetSetVector<CTPPSDiamondRecHit>& recHits,
+	const edm::DetSetVector<CTPPSDiamondLocalTrack>& localTracks,
 	const DiamondTimingCalibration& calib)
 	:
 	recHits(recHits),
@@ -32,6 +31,9 @@ DiamondDetectorClass::DiamondDetectorClass(
 DiamondDetectorClass::~DiamondDetectorClass(){}
 
 void DiamondDetectorClass::ExtractData(){	
+	this->localTracks = localTracks;
+	this->recHits = recHits;
+	
 	RecHit_map_.clear();
 	LocalTrack_map_.clear();
 	Mux_map_.clear();

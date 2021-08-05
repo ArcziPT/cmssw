@@ -39,9 +39,9 @@ typedef std::map<CTPPSDiamondLocalTrack, std::vector<std::pair<ChannelKey, CTPPS
 class DiamondDetectorClass{
 public:
     explicit DiamondDetectorClass(int,
-		const CTPPSGeometry&,
-		edm::DetSetVector<CTPPSDiamondRecHit>, 
-		edm::DetSetVector<CTPPSDiamondLocalTrack>,
+		const CTPPSGeometry&, 
+		const edm::DetSetVector<CTPPSDiamondRecHit>&,
+		const edm::DetSetVector<CTPPSDiamondLocalTrack>&,
 		const DiamondTimingCalibration&);
 	
     ~ DiamondDetectorClass();

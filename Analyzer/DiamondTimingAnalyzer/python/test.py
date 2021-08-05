@@ -1,7 +1,6 @@
 import FWCore.ParameterSet.Config as cms
 from FWCore.ParameterSet.VarParsing import VarParsing
 from RecoPPS.Local.ctppsDiamondLocalReconstruction_cff import *
-import string
 
 process = cms.Process("TIMINGSTUDY")
 options = VarParsing ('analysis')
@@ -13,7 +12,13 @@ process.verbosity = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 process.load("FWCore.MessageService.MessageLogger_cfi")
 
 
-options.register ('calibFile',
+options.register ('calibInput',
+				  0,
+				  VarParsing.multiplicity.singleton,
+				  VarParsing.varType.string,
+				  "Calibration input file")
+
+options.register ('calibOutput',
 				  0,
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.string,
@@ -231,6 +236,11 @@ process.source = cms.Source("PoolSource",
     )
 ))
 
+import sys
+raise RuntimeError(sys.path)
+
+from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
+from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, '101X_dataRun2_HLT_v7', '')
 
@@ -238,10 +248,23 @@ process.GlobalTag = GlobalTag(process.GlobalTag, '101X_dataRun2_HLT_v7', '')
 process.load(options.geometryFile)
 process.load('RecoPPS.Local.ctppsDiamondLocalReconstruction_cff')
 
-process.load('Analyzer.DiamondTimingAnalyzer.diamond_timing_worker_cfi')
-process.load('Analyzer.DiamondTimingAnalyzer.diamond_timing_harvester_cfi')
+process.diamondTimingWorker = DQMEDAnalyzer("DiamondTimingWorker",
+    tagDigi = cms.InputTag("ctppsDiamondRawToDigi", "TimingDiamond"),
+    tagRecHit = cms.InputTag("ctppsDiamondRecHits"),
+    tagPixelLocalTrack = cms.InputTag("ctppsPixelLocalTracks"),
+    tagLocalTrack = cms.InputTag("ctppsDiamondLocalTracks"),
+    tagValidOOT = cms.int32(-1),
+    folder = cms.string("myfolder"),
+    Ntracks_Lcuts = cms.vint32([-1,1,-1,1]),
+    Ntracks_Ucuts = cms.vint32([-1,6,-1,6]),
+)
+
+process.diamondTimingHarvester = DQMEDHarvester("DiamondTimingHarvester",
+    calib_json_output = cms.string(options.calibOutput)
+)
+
 process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
-  calibrationFile = cms.FileInPath('DiamondCalibration.json'),
+  calibrationFile = cms.FileInPath(options.calibInput),
   subDetector = cms.uint32(2),
   appendToDataLabel = cms.string('')
 )

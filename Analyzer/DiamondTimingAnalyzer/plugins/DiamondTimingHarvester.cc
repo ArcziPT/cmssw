@@ -60,6 +60,8 @@ private:
 
   edm::ESGetToken<CTPPSGeometry, VeryForwardRealGeometryRecord> geomEsToken_;
   edm::ESGetToken<PPSTimingCalibration, PPSTimingCalibrationRcd> calibEsToken_;
+
+  std::string output_file;
 };
 
 //
@@ -74,11 +76,12 @@ private:
 // constructors and destructor
 //
 DiamondTimingHarvester::DiamondTimingHarvester(const edm::ParameterSet& iConfig)
-  : 
-  geomEsToken_(esConsumes<edm::Transition::EndRun>()),
-  calibEsToken_(esConsumes<edm::Transition::EndRun>())
-  {
-  // now do what ever initialization is needed
+    : 
+    geomEsToken_(esConsumes<CTPPSGeometry, VeryForwardRealGeometryRecord, edm::Transition::EndRun>()),
+    calibEsToken_(esConsumes<PPSTimingCalibration, PPSTimingCalibrationRcd, edm::Transition::EndRun>()),
+    output_file(iConfig.getParameter<std::string>("calib_json_output"))
+    {
+    // now do what ever initialization is needed
 }
 
 //
@@ -96,19 +99,19 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
                edm::Run const &iRun,
                edm::EventSetup const &iSetup) {
   
-  std::map<ChannelKey, double> Resolution_L2_map_;
+    std::map<ChannelKey, double> Resolution_L2_map_;
   
-  ///////////////////////////////////////////
-  // deriving full track based L2 resolution	
-  ///////////////////////////////////////////
-  std::cout<<"####### EndRun #######"<<std::endl;
+    ///////////////////////////////////////////
+    // deriving full track based L2 resolution	
+    ///////////////////////////////////////////
+    std::cout<<"####### EndRun #######"<<std::endl;
 
-  std::string ch_name, ch_path;
-  const auto& geom = iSetup.getData(geomEsToken_);
-  const auto& calib = DiamondTimingCalibration(iSetup.getData(calibEsToken_));
-  for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
-    if (!CTPPSDiamondDetId::check(it->first))
-      continue;
+    std::string ch_name, ch_path;
+    const auto& geom = iSetup.getData(geomEsToken_);
+    const auto& calib = DiamondTimingCalibration(iSetup.getData(calibEsToken_));
+    for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
+        if (!CTPPSDiamondDetId::check(it->first))
+            continue;
     
     const CTPPSDiamondDetId detid(it->first);
     ChannelKey histo_key(detid);
@@ -128,57 +131,57 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
 
 				double Exp_sigma = expected_trk_time->getTH1F()->GetMean();
 				if (ResL2_sigma > Exp_sigma)
-					Resolution_L2_map_[histo_key] = pow(pow(ResL2_sigma,2)-pow(Exp_sigma,2), 0.5)*1000;
+					Resolution_L2_map_[histo_key] = pow(pow(ResL2_sigma,2)-pow(Exp_sigma,2), 0.5);
 				else
-					Resolution_L2_map_[histo_key] = 50;
+					Resolution_L2_map_[histo_key] = 0.050;
 			}else
-				Resolution_L2_map_[histo_key] = 400;
+				Resolution_L2_map_[histo_key] = 0.400;
 		}else
-      Resolution_L2_map_[histo_key] = calib.timePrecision(histo_key);
-  }
+            Resolution_L2_map_[histo_key] = calib.timePrecision(histo_key);
+    }
 
-  // std::cout<<"####### Calib #######"<<std::endl;
-  // const auto& calib = iSetup.getData(calibEsToken_);
-  // for(int sec=0; sec<2; sec++){
-  //   for(int st=0; st<1; st++){
-  //     for(int plane=0; plane<4; plane++){
-  //       for(int ch=0; ch<12; ch++){
-  //         std::cout<<"("<<sec<<", "<<st<<", "<<plane<<", "<<ch<<")"<<" = "<<calib.timePrecision(sec, st, plane, ch)<<std::endl;
-  //       }
-  //     }
-  //   }
-  // }
-  // DiamondTimingCalibration c(calib);
-  // std::cout<<c<<std::endl;
+    // std::cout<<"####### Calib #######"<<std::endl;
+    // const auto& calib = iSetup.getData(calibEsToken_);
+    // for(int sec=0; sec<2; sec++){
+    //   for(int st=0; st<1; st++){
+    //     for(int plane=0; plane<4; plane++){
+    //       for(int ch=0; ch<12; ch++){
+    //         std::cout<<"("<<sec<<", "<<st<<", "<<plane<<", "<<ch<<")"<<" = "<<calib.timePrecision(sec, st, plane, ch)<<std::endl;
+    //       }
+    //     }
+    //   }
+    // }
+    // DiamondTimingCalibration c(calib);
+    // std::cout<<c<<std::endl;
 
-  // const auto& geom = iSetup.getData(geomEsToken_);
-  // for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
-  //   if (!CTPPSDiamondDetId::check(it->first))
-  //     continue;
+    // const auto& geom = iSetup.getData(geomEsToken_);
+    // for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
+    //   if (!CTPPSDiamondDetId::check(it->first))
+    //     continue;
 
-  //   CTPPSDiamondDetId id((*it).first);
-  //   std::cout<<id.arm()<<", "<<id.station()<<", "<<id.plane()<<", "<<id.channel()<<std::endl;
-  // }
+    //   CTPPSDiamondDetId id((*it).first);
+    //   std::cout<<id.arm()<<", "<<id.station()<<", "<<id.plane()<<", "<<id.channel()<<std::endl;
+    // }
 
-  iBooker.setCurrentFolder("/");
-  for(auto e : Resolution_L2_map_){
-    auto* mEl = iBooker.book1D("res_" + std::to_string(e.first.planeKey.sector) + "_" + std::to_string(e.first.planeKey.station) + "_" + std::to_string(e.first.planeKey.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -60., 60.);
-    mEl->Fill(e.second);
-  }
+    iBooker.setCurrentFolder("/");
+    for(auto e : Resolution_L2_map_){
+        auto* mEl = iBooker.book1D("res_" + std::to_string(e.first.planeKey.sector) + "_" + std::to_string(e.first.planeKey.station) + "_" + std::to_string(e.first.planeKey.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -60., 60.);
+        mEl->Fill(e.second);
+    }
 
-  JSON::save(geom, calib, Resolution_L2_map_, "DiamondCalibrationOut.json");
+    //JSON::save(geom, calib, Resolution_L2_map_, output_file);
 }
 
 // ------------ method fills 'descriptions' with the allowed parameters for the module  ------------
 void DiamondTimingHarvester::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
-  // The following says we do not know what parameters are allowed so do no
-  // validation
-  // Please change this to state exactly what you do use, even if it is no
-  // parameters
-  edm::ParameterSetDescription desc;
-  desc.setAllowAnything();
-  // desc.add<std::string>("folder", "MY_FOLDER");
-  // descriptions.add("DiamondTimingHarvester", desc);
+    // The following says we do not know what parameters are allowed so do no
+    // validation
+    // Please change this to state exactly what you do use, even if it is no
+    // parameters
+    edm::ParameterSetDescription desc;
+    desc.setAllowAnything();
+    // desc.add<std::string>("folder", "MY_FOLDER");
+    // descriptions.add("DiamondTimingHarvester", desc);
 }
 
 // define this as a plug-in

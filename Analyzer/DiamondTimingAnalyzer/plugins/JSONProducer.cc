@@ -31,7 +31,7 @@ void JSON::save(const CTPPSGeometry& geom,
 
 		ch_node.put("channel", key.channel);
 		ch_node.put("time_offset", calib.timeOffset(key));
-		ch_node.put("time_precision", (int)std::round(res[key]));
+		ch_node.put("time_precision", res[key]);
 		ch_node.add_child("param", param_node);
 
 		plane_node_map[key.planeKey].push_back(std::make_pair("", ch_node));
