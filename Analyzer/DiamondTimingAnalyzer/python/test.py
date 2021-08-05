@@ -41,6 +41,12 @@ options.register ('loopIndex',
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.int,
 				  "loop iteration")
+
+options.register ('treshold',
+				  0,
+				  VarParsing.multiplicity.singleton,
+				  VarParsing.varType.float,
+				  "treshold for resolution diff")
 				  
 				  
 options.parseArguments()
@@ -263,7 +269,8 @@ process.diamondTimingWorker = DQMEDAnalyzer("DiamondTimingWorker",
 
 process.diamondTimingHarvester = DQMEDHarvester("DiamondTimingHarvester",
     calib_json_output = cms.string(options.calibOutput),
-    loopIndex = cms.int32(options.loopIndex)
+    loopIndex = cms.int32(options.loopIndex),
+    treshold = cms.double(options.treshold)
 )
 
 process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',

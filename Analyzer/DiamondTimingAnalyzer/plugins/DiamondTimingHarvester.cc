@@ -19,6 +19,9 @@
 #include <string>
 #include <bitset>
 
+#include <iostream>
+#include <fstream> 
+
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "DQMServices/Core/interface/DQMEDHarvester.h"
@@ -64,6 +67,7 @@ private:
   std::string output_file;
   std::vector<DiamondTimingCalibration> calibs;
   int loop_index;
+  double treshold;
 };
 
 //
@@ -82,7 +86,8 @@ DiamondTimingHarvester::DiamondTimingHarvester(const edm::ParameterSet& iConfig)
     geomEsToken_(esConsumes<CTPPSGeometry, VeryForwardRealGeometryRecord, edm::Transition::EndRun>()),
     calibEsToken_(esConsumes<PPSTimingCalibration, PPSTimingCalibrationRcd, edm::Transition::EndRun>()),
     output_file(iConfig.getParameter<std::string>("calib_json_output")),
-    loop_index(iConfig.getParameter<int>("loopIndex"))
+    loop_index(iConfig.getParameter<int>("loopIndex")),
+    treshold(iConfig.getParameter<double>("treshold"))
     {
     for(int i=0; i<loop_index; i++){
         std::string path = "calib_";
@@ -178,9 +183,22 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
     }
 
     if(loop_index > 0){
+        bool finish = true;
+
         for(auto e : Resolution_L2_map_){
             auto* mEl = iBooker.book1D("dff_res_" + std::to_string(e.first.planeKey.sector) + "_" + std::to_string(e.first.planeKey.station) + "_" + std::to_string(e.first.planeKey.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -60., 60.);
-            mEl->Fill(std::abs(e.second - calibs[loop_index-1].timePrecision(e.first)));
+            
+            double diff = std::abs(e.second - calibs[loop_index-1].timePrecision(e.first));
+            mEl->Fill(diff);
+
+            if(diff > treshold)
+                finish = false;
+        }
+
+        if(finish){
+            std::ofstream outfile("finish");
+            outfile << "finish" << std::endl;
+            outfile.close();
         }
     }
 
