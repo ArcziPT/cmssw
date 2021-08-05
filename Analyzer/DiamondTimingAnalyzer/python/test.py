@@ -236,9 +236,6 @@ process.source = cms.Source("PoolSource",
     )
 ))
 
-import sys
-raise RuntimeError(sys.path)
-
 from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
 from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 from Configuration.AlCa.GlobalTag import GlobalTag
@@ -254,7 +251,6 @@ process.diamondTimingWorker = DQMEDAnalyzer("DiamondTimingWorker",
     tagPixelLocalTrack = cms.InputTag("ctppsPixelLocalTracks"),
     tagLocalTrack = cms.InputTag("ctppsDiamondLocalTracks"),
     tagValidOOT = cms.int32(-1),
-    folder = cms.string("myfolder"),
     Ntracks_Lcuts = cms.vint32([-1,1,-1,1]),
     Ntracks_Ucuts = cms.vint32([-1,6,-1,6]),
 )

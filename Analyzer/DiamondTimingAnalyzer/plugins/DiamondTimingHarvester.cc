@@ -169,7 +169,7 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
         mEl->Fill(e.second);
     }
 
-    //JSON::save(geom, calib, Resolution_L2_map_, output_file);
+    JSON::save(geom, calib, Resolution_L2_map_, output_file);
 }
 
 // ------------ method fills 'descriptions' with the allowed parameters for the module  ------------
