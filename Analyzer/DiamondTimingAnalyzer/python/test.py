@@ -35,6 +35,12 @@ options.register ('validOOT',
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.int,
 				  "valid OOT slice")
+
+options.register ('loopIndex',
+				  0,
+				  VarParsing.multiplicity.singleton,
+				  VarParsing.varType.int,
+				  "loop iteration")
 				  
 				  
 options.parseArguments()
@@ -256,7 +262,8 @@ process.diamondTimingWorker = DQMEDAnalyzer("DiamondTimingWorker",
 )
 
 process.diamondTimingHarvester = DQMEDHarvester("DiamondTimingHarvester",
-    calib_json_output = cms.string(options.calibOutput)
+    calib_json_output = cms.string(options.calibOutput),
+    loopIndex = cms.int32(options.loopIndex)
 )
 
 process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',

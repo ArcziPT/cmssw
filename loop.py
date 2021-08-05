@@ -10,6 +10,7 @@ def execute_job(step, jsonIn, jsonOut, geometry):
     command += f" calibInput=\"{jsonIn}\""
     command += f" calibOutput=\"{jsonOut}\""
     command += f" geometryFile=\"{geometry}\""
+    command += f" loopIndex=\"{step}\""
     
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
     process.wait()

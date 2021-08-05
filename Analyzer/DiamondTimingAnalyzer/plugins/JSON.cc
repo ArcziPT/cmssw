@@ -1,4 +1,4 @@
-#include "JSONProducer.h"
+#include "JSON.h"
 
 namespace pt = boost::property_tree;
 
@@ -78,4 +78,40 @@ void JSON::save(const CTPPSGeometry& geom,
 	root.add_child("Parameters", parameters);
 
 	pt::write_json(output_file, root);
+}
+
+PPSTimingCalibration JSON::read(const std::string& path){
+	pt::ptree mother_node;
+	pt::read_json(path, mother_node);
+
+	const std::string formula = mother_node.get<std::string>("formula");
+	PPSTimingCalibration::ParametersMap params;
+	PPSTimingCalibration::TimingMap time_info;
+
+	for (pt::ptree::value_type& par : mother_node.get_child("Parameters.Sectors")) {
+		PPSTimingCalibration::Key key;
+		key.db = par.second.get<int>("sector");
+
+		for (pt::ptree::value_type& st : par.second.get_child("Stations")) {
+		key.sampic = st.second.get<int>("station");
+
+			for (pt::ptree::value_type& pl : st.second.get_child("Planes")) {
+				key.channel = pl.second.get<int>("plane");
+
+				for (pt::ptree::value_type& ch : pl.second.get_child("Channels")) {
+					key.cell = ch.second.get<int>("channel");
+					double timeOffset = ch.second.get<double>("time_offset");
+					double timePrecision = ch.second.get<double>("time_precision");
+					time_info[key] = {timeOffset, timePrecision};
+
+					std::vector<double> values;
+					for (pt::ptree::value_type& param : ch.second.get_child("param"))
+						values.emplace_back(std::stod(param.second.data(), nullptr));
+					params[key] = values;
+				}
+			}
+		}
+	}
+
+	return PPSTimingCalibration(formula, params, time_info);
 }

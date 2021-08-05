@@ -21,6 +21,8 @@ public:
 		const DiamondTimingCalibration& calib,
 		std::map<ChannelKey, double>& res,
 		std::string output_file_name);
+
+	static PPSTimingCalibration read(const std::string& path);
 };
 
 #endif
