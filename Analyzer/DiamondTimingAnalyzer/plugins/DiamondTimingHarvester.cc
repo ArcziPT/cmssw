@@ -43,6 +43,9 @@
 #include "DiamondTimingCalibration.h"
 #include "JSON.h"
 
+#include "TFile.h"
+#include "TGraph.h"
+
 //
 // class declaration
 //
@@ -68,6 +71,9 @@ private:
   std::vector<DiamondTimingCalibration> calibs;
   int loop_index;
   double treshold;
+
+  double mean_max;
+  double rms_max;
 };
 
 //
@@ -87,7 +93,9 @@ DiamondTimingHarvester::DiamondTimingHarvester(const edm::ParameterSet& iConfig)
     calibEsToken_(esConsumes<PPSTimingCalibration, PPSTimingCalibrationRcd, edm::Transition::EndRun>()),
     output_file(iConfig.getParameter<std::string>("calib_json_output")),
     loop_index(iConfig.getParameter<int>("loopIndex")),
-    treshold(iConfig.getParameter<double>("treshold"))
+    treshold(iConfig.getParameter<double>("treshold")),
+    mean_max(iConfig.getParameter<double>("meanMax")),
+    rms_max(iConfig.getParameter<double>("rmsMax"))
     {
     for(int i=0; i<loop_index; i++){
         std::string path = "calib_";
@@ -122,17 +130,34 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
     std::string ch_name, ch_path;
     const auto& geom = iSetup.getData(geomEsToken_);
     const auto& calib = DiamondTimingCalibration(iSetup.getData(calibEsToken_));
+
+    //std::string name = "graph_";
+    //name += std::to_string(loop_index);
+    //name += ".root";
+    //TFile f(name.c_str(), "CREATE");
     for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
         if (!CTPPSDiamondDetId::check(it->first))
             continue;
     
-    const CTPPSDiamondDetId detid(it->first);
-    ChannelKey histo_key(detid);
-    detid.channelName(ch_name);
-    detid.channelName(ch_path, CTPPSDiamondDetId::nPath);
+        const CTPPSDiamondDetId detid(it->first);
+        ChannelKey histo_key(detid);
+        detid.channelName(ch_name);
+        detid.channelName(ch_path, CTPPSDiamondDetId::nPath);
 
-    auto* l2_res = iGetter.get(ch_path + "/" + "l2_res_" + ch_name);
-    auto* expected_trk_time = iGetter.get(ch_path + "/" + "expected_trk_time_res_" + ch_name);
+        //auto* graph = new TGraph(loop_index);
+        //std::string graphName = "graph_" + ch_name;
+        //graph->SetName(graphName.c_str());
+
+        auto* t = iGetter.get(ch_path + "/" + "t_" + ch_name);
+        auto m = t->getMean();
+        auto rms = t->getRMS();
+        if(m >= mean_max)
+            edm::LogWarning("DiamondTimingHarvester::dqmEndRun")<<"[WARNING] Mean value for "<<histo_key<<" is bigger than "<<mean_max<<std::endl;
+        if(rms >= rms_max)
+            edm::LogWarning("DiamondTimingHarvester::dqmEndRun")<<"[WARNING] RMS value for "<<histo_key<<" is bigger than "<<rms_max<<std::endl;
+
+        auto* l2_res = iGetter.get(ch_path + "/" + "l2_res_" + ch_name);
+        auto* expected_trk_time = iGetter.get(ch_path + "/" + "expected_trk_time_res_" + ch_name);
 		if(l2_res->getEntries() > 100){
 			l2_res->getTH1F()->Fit("gaus","+Q","",-10,10);
 			
@@ -151,42 +176,27 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
 				Resolution_L2_map_[histo_key] = 0.400;
 		}else
             Resolution_L2_map_[histo_key] = calib.timePrecision(histo_key);
+
+        iBooker.setCurrentFolder(ch_path);
+
+        auto* resHist = iBooker.book1D("res_" + ch_name, "title;x;y", 1200, -1, 1);
+        resHist->Fill(Resolution_L2_map_[histo_key]);
+
+        auto* resStepHist = iBooker.book2D("res_vs_step_" + ch_name, "title;x;y", 1200, -1, loop_index+1, 1200, 0, 1);
+        for(int i=0; i<loop_index; i++){
+            resStepHist->Fill(i, calibs[i].timePrecision(histo_key));
+            //graph->SetPoint(i, i, calibs[i].timePrecision(histo_key));
+        }
+        resStepHist->Fill(loop_index, Resolution_L2_map_[histo_key]);
+        //f.Add(graph);
     }
-
-    // std::cout<<"####### Calib #######"<<std::endl;
-    // const auto& calib = iSetup.getData(calibEsToken_);
-    // for(int sec=0; sec<2; sec++){
-    //   for(int st=0; st<1; st++){
-    //     for(int plane=0; plane<4; plane++){
-    //       for(int ch=0; ch<12; ch++){
-    //         std::cout<<"("<<sec<<", "<<st<<", "<<plane<<", "<<ch<<")"<<" = "<<calib.timePrecision(sec, st, plane, ch)<<std::endl;
-    //       }
-    //     }
-    //   }
-    // }
-    // DiamondTimingCalibration c(calib);
-    // std::cout<<c<<std::endl;
-
-    // const auto& geom = iSetup.getData(geomEsToken_);
-    // for (auto it = geom.beginSensor(); it != geom.endSensor(); ++it) {
-    //   if (!CTPPSDiamondDetId::check(it->first))
-    //     continue;
-
-    //   CTPPSDiamondDetId id((*it).first);
-    //   std::cout<<id.arm()<<", "<<id.station()<<", "<<id.plane()<<", "<<id.channel()<<std::endl;
-    // }
-
-    iBooker.setCurrentFolder("/");
-    for(auto e : Resolution_L2_map_){
-        auto* mEl = iBooker.book1D("res_" + std::to_string(e.first.planeKey.sector) + "_" + std::to_string(e.first.planeKey.station) + "_" + std::to_string(e.first.planeKey.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -60., 60.);
-        mEl->Fill(e.second);
-    }
+    //f.Write();
 
     if(loop_index > 0){
         bool finish = true;
 
         for(auto e : Resolution_L2_map_){
-            auto* mEl = iBooker.book1D("dff_res_" + std::to_string(e.first.planeKey.sector) + "_" + std::to_string(e.first.planeKey.station) + "_" + std::to_string(e.first.planeKey.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -60., 60.);
+            auto* mEl = iBooker.book1D("dff_res_" + std::to_string(e.first.planeKey.sector) + "_" + std::to_string(e.first.planeKey.station) + "_" + std::to_string(e.first.planeKey.plane) + "_" + std::to_string(e.first.channel), "title;x;y", 1200, -1, 1);
             
             double diff = std::abs(e.second - calibs[loop_index-1].timePrecision(e.first));
             mEl->Fill(diff);

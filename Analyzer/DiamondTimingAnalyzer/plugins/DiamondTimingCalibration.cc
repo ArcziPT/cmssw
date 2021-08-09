@@ -6,11 +6,11 @@ std::ostream& operator<<(std::ostream& os, const DiamondTimingCalibration& data)
 }
 
 std::ostream& operator<<(std::ostream& os, const ChannelKey& key){
-    os<<"{"<<key.planeKey<<", "<<key.channel<<"}";
+    os<<"{planeKey="<<key.planeKey<<", channel="<<key.channel<<"}";
     return os;
 }
 
 std::ostream& operator<<(std::ostream& os, const PlaneKey& planeKey){
-    os<<"{"<<planeKey.sector<<", "<<planeKey.station<<", "<<planeKey.plane<<"}";
+    os<<"{sector="<<planeKey.sector<<", station="<<planeKey.station<<", plane="<<planeKey.plane<<"}";
     return os;
 }

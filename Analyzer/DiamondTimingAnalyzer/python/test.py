@@ -47,6 +47,18 @@ options.register ('treshold',
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.float,
 				  "treshold for resolution diff")
+
+options.register ('meanMax',
+				  0,
+				  VarParsing.multiplicity.singleton,
+				  VarParsing.varType.float,
+				  "max mean of t distribution")
+
+options.register ('rmsMax',
+				  0,
+				  VarParsing.multiplicity.singleton,
+				  VarParsing.varType.float,
+				  "max rms of t distribution")
 				  
 				  
 options.parseArguments()
@@ -270,7 +282,9 @@ process.diamondTimingWorker = DQMEDAnalyzer("DiamondTimingWorker",
 process.diamondTimingHarvester = DQMEDHarvester("DiamondTimingHarvester",
     calib_json_output = cms.string(options.calibOutput),
     loopIndex = cms.int32(options.loopIndex),
-    treshold = cms.double(options.treshold)
+    treshold = cms.double(options.treshold),
+    meanMax = cms.double(options.meanMax),
+    rmsMax = cms.double(options.rmsMax)
 )
 
 process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
