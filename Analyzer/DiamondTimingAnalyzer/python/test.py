@@ -12,26 +12,20 @@ process.verbosity = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 
-options.register ('calibInput',
-				  0,
-				  VarParsing.multiplicity.singleton,
-				  VarParsing.varType.string,
-				  "Calibration input file for this iteration")
-
 options.register ('calibOutput',
-				  0,
+				  'test_calib.json',
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.string,
 				  "Output file for calibration from this iteration")
 
 options.register ('geometryFile',
-				  0,
+				  'Geometry.VeryForwardGeometry.geometryRPFromDD_2018_cfi',
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.string,
 				  "Geometry input file")
 
 options.register ('validOOT',
-				  0,
+				  -1,
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.int,
 				  "valid OOT slice")
@@ -55,13 +49,13 @@ options.register ('treshold',
 				  "treshold for resolution diff")
 
 options.register ('meanMax',
-				  0,
+				  1,
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.float,
 				  "max mean of t distribution")
 
 options.register ('rmsMax',
-				  0,
+				  1,
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.float,
 				  "max rms of t distribution")
@@ -269,7 +263,14 @@ process.source = cms.Source("PoolSource",
 from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
 from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 from Configuration.AlCa.GlobalTag import GlobalTag
-process.GlobalTag = GlobalTag(process.GlobalTag, '101X_dataRun2_HLT_v7', '')
+process.GlobalTag = GlobalTag(process.GlobalTag, '106X_dataRun2_v26', '')
+
+process.GlobalTag.toGet = cms.VPSet(
+  cms.PSet(record = cms.string('PPSTimingCalibrationRcd'),
+            tag = cms.string('PPSDiamondTimingCalibration_v1'),
+           connect = cms.string("frontier://FrontierProd/CMS_CONDITIONS")
+          )
+)
 
 # rechits production
 process.load(options.geometryFile)
@@ -285,19 +286,13 @@ process.diamondTimingWorker = DQMEDAnalyzer("DiamondTimingWorker",
     Ntracks_Ucuts = cms.vint32([-1,6,-1,6]),
 )
 
-#process.diamondTimingHarvester = DQMEDHarvester("DiamondTimingHarvester",
-#    calib_json_output = cms.string(options.calibOutput),
-#    calibFiles = cms.vstring(options.calibFiles),
-#    loopIndex = cms.int32(options.loopIndex),
-#    treshold = cms.double(options.treshold),
-#    meanMax = cms.double(options.meanMax),
-#    rmsMax = cms.double(options.rmsMax)
-#)
-
-process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
-  calibrationFile = cms.FileInPath(options.calibInput),
-  subDetector = cms.uint32(2),
-  appendToDataLabel = cms.string('')
+process.diamondTimingHarvester = DQMEDHarvester("DiamondTimingHarvester",
+   calib_json_output = cms.string(options.calibOutput),
+   calibFiles = cms.vstring(options.calibFiles),
+   loopIndex = cms.int32(options.loopIndex),
+   treshold = cms.double(options.treshold),
+   meanMax = cms.double(options.meanMax),
+   rmsMax = cms.double(options.rmsMax)
 )
 
 process.TFileService = cms.Service("TFileService",
@@ -305,12 +300,12 @@ process.TFileService = cms.Service("TFileService",
 )
 
 process.DQMStore = cms.Service("DQMStore")
-#process.load("DQMServices.FileIO.DQMFileSaverOnline_cfi")
+process.load("DQMServices.FileIO.DQMFileSaverOnline_cfi")
 
 #print(vars(process))
 
 process.path = cms.Path(
-   process.diamondTimingWorker
+   (process.diamondTimingWorker * process.diamondTimingHarvester) + process.dqmSaver
 )
 
 process.schedule = cms.Schedule(

@@ -17,6 +17,8 @@
 //
 
 #include <string>
+#include <array>
+#include <algorithm>
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
@@ -86,7 +88,6 @@ private:
     Histograms_DiamondTiming histos;
 
     edm::ESHandle<CTPPSGeometry> geom;
-    edm::ESHandle<PPSTimingCalibration> calib;
     
     int validOOT;
     std::map<std::pair<int, int>, std::pair<int, int>> Ntracks_cuts_map_;  //arm, station ,, Lcut,Ucut
@@ -114,7 +115,7 @@ DiamondTimingWorker::DiamondTimingWorker(const edm::ParameterSet& iConfig)
     tokenPixelLocalTrack_(
         consumes<edm::DetSetVector<CTPPSPixelLocalTrack>>(iConfig.getParameter<edm::InputTag>("tagPixelLocalTrack"))),
     geomEsToken_(esConsumes<CTPPSGeometry, VeryForwardRealGeometryRecord, edm::Transition::BeginRun>()),
-    calibEsToken_(esConsumes<PPSTimingCalibration, PPSTimingCalibrationRcd, edm::Transition::BeginRun>()),
+    calibEsToken_(esConsumes<PPSTimingCalibration, PPSTimingCalibrationRcd>()),
     validOOT(iConfig.getParameter<int>("tagValidOOT")) {
     
     Ntracks_cuts_map_[std::make_pair(SECTOR::_45_ID, STATION::_210_M_ID)] =
@@ -147,10 +148,12 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
     edm::Handle<edm::DetSetVector<CTPPSDiamondRecHit>> recHits;
     edm::Handle<edm::DetSetVector<CTPPSDiamondLocalTrack>> localTracks;
     edm::Handle<edm::DetSetVector<CTPPSPixelLocalTrack>> pixelLocalTracks;
+    edm::ESHandle<PPSTimingCalibration> calib;
 
     iEvent.getByToken(tokenRecHit_, recHits);
     iEvent.getByToken(tokenLocalTrack_, localTracks);
     iEvent.getByToken(tokenPixelLocalTrack_, pixelLocalTracks);
+    calib = iSetup.getHandle(calibEsToken_);
 
     DiamondDetectorClass DiamondDet(validOOT, *geom, *recHits, *localTracks, DiamondTimingCalibration(*calib));
 
@@ -227,6 +230,7 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
     //
     /////////////////////////////////////////////////////////////////
 
+    std::array<bool, 4> active_plane{ {false, false, false, false} };
     for (const auto& LocalTrack_mapIter : DiamondDet.GetDiamondTrack_map()) {  // loop on predigested tracks
         int sector = LocalTrack_mapIter.first.z0() > 0.0 ? SECTOR::_45_ID : SECTOR::_56_ID;
 
@@ -239,11 +243,13 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
         int station = LocalTrack_mapIter.second.at(0).first.planeKey.station;
         auto stationKey = std::pair<int, int>{sector, station};
 
-        bool mark_tag = DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 0)) == 1 &&
-                        DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 1)) == 1 &&
-                        DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 2)) == 1 &&
-                        DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 3)) == 1 &&
-                        DiamondDet.GetTrackMuxInSector(sector) == 1;
+        active_plane[0] = DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 0)) == 1;
+        active_plane[1] = DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 1)) == 1;
+        active_plane[2] = DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 2)) == 1;
+        active_plane[3] = DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 3)) == 1;
+        int active_num = std::count_if(active_plane.begin(), active_plane.end(), [](bool it) -> bool{return it;});
+
+        bool mark_tag = DiamondDet.GetTrackMuxInSector(sector) == 1 && active_num >= 3;
 
         std::vector<ChannelKey> hit_selected(PLANES_X_DETECTOR);
         std::vector<std::pair<ChannelKey, CTPPSDiamondRecHit>>::const_iterator hit_iter;
@@ -255,12 +261,15 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
         for (hit_iter = LocalTrack_mapIter.second.begin(); hit_iter < LocalTrack_mapIter.second.end(); hit_iter++) {
             auto& key = (*hit_iter).first;
 
+            if(!active_plane[key.planeKey.plane])
+                continue;
+
             double hit_time_SPC = DiamondDet.GetTime(key);
             double hit_prec_SPC = DiamondDet.GetPadPrecision(key);
             double hit_weig_SPC = DiamondDet.GetPadWeight(key);
 
             if (mark_tag)
-                hit_selected[(*hit_iter).first.planeKey.plane] = (*hit_iter).first;  // save for resolution reco
+                hit_selected[key.planeKey.plane] = key;  // save for resolution reco
 
             Track_time_SPC = (Track_time_SPC * pow(Track_precision_SPC, -2) + hit_time_SPC * hit_weig_SPC) /
                              (pow(Track_precision_SPC, -2) + hit_weig_SPC);
@@ -275,12 +284,16 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
 
         if (mark_tag) {
             for (int pl_mark = 0; pl_mark < PLANES_X_DETECTOR; pl_mark++) {
+                if(!active_plane[pl_mark]) continue;
+
                 double Marked_track_time = 12.5;
                 double Marked_track_precision = 25.0;
                 double Marked_hit_time = 0.0;
                 int Marked_hit_channel = -1;
 
                 for (int pl_loop = 0; pl_loop < PLANES_X_DETECTOR; pl_loop++) {
+                    if(!active_plane[pl_loop]) continue;
+
                     if (pl_loop == pl_mark) {
                         Marked_hit_time = DiamondDet.GetTime(hit_selected[pl_loop]);
                         Marked_hit_channel = hit_selected[pl_loop].channel;
@@ -313,8 +326,6 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
 void DiamondTimingWorker::bookHistograms(DQMStore::IBooker& iBooker,
                                          edm::Run const& run,
                                          edm::EventSetup const& iSetup) {
-    calib = iSetup.getHandle(calibEsToken_);
-
     std::string ch_path;
     geom = iSetup.getHandle(geomEsToken_);
     for (auto it = (*geom).beginSensor(); it != (*geom).endSensor(); ++it) {

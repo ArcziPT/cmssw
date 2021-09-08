@@ -12,20 +12,20 @@ process.verbosity = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 process.load("FWCore.MessageService.MessageLogger_cfi")
 process.MessageLogger.cerr.FwkReport.reportEvery = 1000
 
-options.register ('calibInput',
-				  'calib_0.json',
-				  VarParsing.multiplicity.singleton,
+options.register ('rootFiles',
+				  [],
+				  VarParsing.multiplicity.list,
 				  VarParsing.varType.string,
-				  "Calibration input file for this iteration")
+				  "root files produced by DQMWorker")
 
 options.register ('calibOutput',
-				  'calib_1.json',
+				  'calib.json',
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.string,
 				  "Output file for calibration from this iteration")
 
 options.register ('geometryFile',
-				  'geometry.VeryForwardGeometry.geometryRPFromDD_2018_cfi',
+				  'Geometry.VeryForwardGeometry.geometryRPFromDD_2018_cfi',
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.string,
 				  "Geometry input file")
@@ -71,21 +71,25 @@ process.load('Configuration.StandardSequences.FrontierConditions_GlobalTag_cff')
 
 #SOURCE
 process.source = cms.Source("DQMRootSource",
-    fileNames = cms.untracked.vstring(*(
-        "file:/eos/user/a/awolk/ZeroBias/crab_rename_test/210816_145520/0000/run_output_1.root",
-        "file:/eos/user/a/awolk/ZeroBias/crab_rename_test/210816_145520/0000/run_output_2.root",
-        #"file:/eos/user/a/awolk/ZeroBias/crab_rename_test/210816_145520/0000/run_output_3.root",
-        "file:/eos/user/a/awolk/ZeroBias/crab_rename_test/210816_145520/0000/run_output_4.root",
-        "file:/eos/user/a/awolk/ZeroBias/crab_rename_test/210816_145520/0000/run_output_5.root",
-        "file:/eos/user/a/awolk/ZeroBias/crab_rename_test/210816_145520/0000/run_output_6.root",
-        "file:/eos/user/a/awolk/ZeroBias/crab_rename_test/210816_145520/0000/run_output_7.root",
-        "file:/eos/user/a/awolk/ZeroBias/crab_rename_test/210816_145520/0000/run_output_8.root"
-    ))
+    fileNames = cms.untracked.vstring(options.rootFiles)
 )
 
 from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 from Configuration.AlCa.GlobalTag import GlobalTag
-process.GlobalTag = GlobalTag(process.GlobalTag, '101X_dataRun2_HLT_v7', '')
+process.GlobalTag = GlobalTag(process.GlobalTag, '106X_dataRun2_v26', '')
+
+process.GlobalTag.toGet = cms.VPSet(
+	cms.PSet(record = cms.string('PPSTimingCalibrationRcd'),
+			 tag = cms.string('PPSDiamondTimingCalibration_v1'),
+			 connect = cms.string("frontier://FrontierProd/CMS_CONDITIONS")
+	)
+)
+# else:
+# 	process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
+# 		calibrationFile = cms.FileInPath(options.calibInput),
+# 		subDetector = cms.uint32(2),
+# 		appendToDataLabel = cms.string('')
+# 	)
 
 # rechits production
 process.load("DQM.Integration.config.environment_cfi")
@@ -99,12 +103,6 @@ process.diamondTimingHarvester = DQMEDHarvester("DiamondTimingHarvester",
    treshold = cms.double(options.treshold),
    meanMax = cms.double(options.meanMax),
    rmsMax = cms.double(options.rmsMax)
-)
-
-process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
-  calibrationFile = cms.FileInPath(options.calibInput),
-  subDetector = cms.uint32(2),
-  appendToDataLabel = cms.string('')
 )
 
 #CONFIGURE DQM Saver
