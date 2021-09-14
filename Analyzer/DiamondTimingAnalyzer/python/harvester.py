@@ -18,6 +18,12 @@ options.register ('rootFiles',
 				  VarParsing.varType.string,
 				  "root files produced by DQMWorker")
 
+options.register ('calibInput',
+				  '',
+				  VarParsing.multiplicity.singleton,
+				  VarParsing.varType.string,
+				  "Input file for calibration from this iteration")
+
 options.register ('calibOutput',
 				  'calib.json',
 				  VarParsing.multiplicity.singleton,
@@ -78,18 +84,19 @@ from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, '106X_dataRun2_v26', '')
 
-process.GlobalTag.toGet = cms.VPSet(
-	cms.PSet(record = cms.string('PPSTimingCalibrationRcd'),
-			 tag = cms.string('PPSDiamondTimingCalibration_v1'),
-			 connect = cms.string("frontier://FrontierProd/CMS_CONDITIONS")
+if options.calibInput == "":
+	process.GlobalTag.toGet = cms.VPSet(
+		cms.PSet(record = cms.string('PPSTimingCalibrationRcd'),
+				tag = cms.string('PPSDiamondTimingCalibration_v1'),
+				connect = cms.string("frontier://FrontierProd/CMS_CONDITIONS")
+		)
 	)
-)
-# else:
-# 	process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
-# 		calibrationFile = cms.FileInPath(options.calibInput),
-# 		subDetector = cms.uint32(2),
-# 		appendToDataLabel = cms.string('')
-# 	)
+else:
+	process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
+		calibrationFile = cms.string(options.calibInput),
+		subDetector = cms.uint32(2),
+		appendToDataLabel = cms.string('')
+	)
 
 # rechits production
 process.load("DQM.Integration.config.environment_cfi")

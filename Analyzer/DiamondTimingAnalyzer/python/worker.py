@@ -249,7 +249,7 @@ if options.calibInput == '':
     )
 else:
     process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
-        calibrationFile = cms.FileInPath(options.calibInput),
+        calibrationFile = cms.string(options.calibInput),
         subDetector = cms.uint32(2),
         appendToDataLabel = cms.string('')
     )

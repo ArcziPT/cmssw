@@ -189,14 +189,14 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
         for(int i=0; i<=loop_index; i++){
             resStepHist->Fill(i, calibs[i].timePrecision(histo_key));
         }
-        resStepHist->Fill(loop_index, Resolution_L2_map_[histo_key]);
+        resStepHist->Fill(loop_index+1, Resolution_L2_map_[histo_key]);
     }
 
     if(loop_index > 0){
         for(auto e : Resolution_L2_map_){
             auto* mEl = iBooker.book1D("diff_res_" + ch_name, "Resolution difference;Difference (ns);Entries", 1200, -1, 1);
             
-            double diff = std::abs(e.second - calibs[loop_index-1].timePrecision(e.first));
+            double diff = std::abs(e.second - calibs[loop_index].timePrecision(e.first));
             mEl->Fill(diff);
         }
     }
