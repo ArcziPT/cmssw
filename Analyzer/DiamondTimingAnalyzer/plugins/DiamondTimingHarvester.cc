@@ -71,7 +71,6 @@ private:
   std::vector<std::string> calib_files;
   std::vector<DiamondTimingCalibration> calibs;
   int loop_index;
-  double treshold;
 
   double mean_max;
   double rms_max;
@@ -95,7 +94,6 @@ DiamondTimingHarvester::DiamondTimingHarvester(const edm::ParameterSet& iConfig)
     output_file(iConfig.getParameter<std::string>("calib_json_output")),
     calib_files(iConfig.getParameter<std::vector<std::string>>("calibFiles")),
     loop_index(iConfig.getParameter<int>("loopIndex")),
-    treshold(iConfig.getParameter<double>("treshold")),
     mean_max(iConfig.getParameter<double>("meanMax")),
     rms_max(iConfig.getParameter<double>("rmsMax"))
     {
@@ -146,7 +144,7 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
         ch_name = histo_key.to_string();
         detid.channelName(ch_path, CTPPSDiamondDetId::nPath);
 
-        auto* t = iGetter.get(ch_path + "/" + "Time distribution " + ch_name);
+        auto* t = iGetter.get(ch_path + "/" + "Valid Time distribution " + ch_name);
         auto m = t->getMean();
         auto rms = t->getRMS();
         if(std::abs(m) >= mean_max)

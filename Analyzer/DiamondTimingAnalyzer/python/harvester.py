@@ -18,11 +18,11 @@ options.register ('rootFiles',
 				  VarParsing.varType.string,
 				  "root files produced by DQMWorker")
 
-options.register ('calibInput',
-				  '',
-				  VarParsing.multiplicity.singleton,
-				  VarParsing.varType.string,
-				  "Input file for calibration from this iteration")
+# options.register ('calibInput',
+# 				  '',
+# 				  VarParsing.multiplicity.singleton,
+# 				  VarParsing.varType.string,
+# 				  "Input file for calibration from this iteration")
 
 options.register ('calibOutput',
 				  'calib.json',
@@ -47,12 +47,6 @@ options.register ('loopIndex',
 				  VarParsing.multiplicity.singleton,
 				  VarParsing.varType.int,
 				  "loop iteration")
-
-options.register ('treshold',
-				  0.05,
-				  VarParsing.multiplicity.singleton,
-				  VarParsing.varType.float,
-				  "treshold for resolution diff")
 
 options.register ('meanMax',
 				  1,
@@ -84,19 +78,18 @@ from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, '106X_dataRun2_v26', '')
 
-if options.calibInput == "":
-	process.GlobalTag.toGet = cms.VPSet(
-		cms.PSet(record = cms.string('PPSTimingCalibrationRcd'),
-				tag = cms.string('PPSDiamondTimingCalibration_v1'),
-				connect = cms.string("frontier://FrontierProd/CMS_CONDITIONS")
-		)
+process.GlobalTag.toGet = cms.VPSet(
+	cms.PSet(record = cms.string('PPSTimingCalibrationRcd'),
+			tag = cms.string('PPSDiamondTimingCalibration_v1'),
+			connect = cms.string("frontier://FrontierProd/CMS_CONDITIONS")
 	)
-else:
-	process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
-		calibrationFile = cms.string(options.calibInput),
-		subDetector = cms.uint32(2),
-		appendToDataLabel = cms.string('')
-	)
+)
+# else:
+# 	process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
+# 		calibrationFile = cms.string(options.calibInput),
+# 		subDetector = cms.uint32(2),
+# 		appendToDataLabel = cms.string('')
+# 	)
 
 # rechits production
 process.load("DQM.Integration.config.environment_cfi")
