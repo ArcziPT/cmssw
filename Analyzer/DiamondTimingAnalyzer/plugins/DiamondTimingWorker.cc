@@ -91,6 +91,7 @@ private:
     
     int validOOT;
     std::map<std::pair<int, int>, std::pair<int, int>> Ntracks_cuts_map_;  //arm, station ,, Lcut,Ucut
+    std::map<ChannelKey, int> planes_config;
 };
 
 //
@@ -133,6 +134,8 @@ DiamondTimingWorker::DiamondTimingWorker(const edm::ParameterSet& iConfig)
     Ntracks_cuts_map_[std::make_pair(SECTOR::_56_ID, STATION::_220_M_ID)] =
         std::make_pair(iConfig.getParameter<std::vector<int>>("Ntracks_Lcuts")[3],
                        iConfig.getParameter<std::vector<int>>("Ntracks_Ucuts")[3]);
+
+    planes_config = JSON::read_planes_config(iConfig.getParameter<std::string>("planesConfig"));
 }
 
 //
@@ -249,7 +252,7 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
         active_plane[3] = DiamondDet.GetMuxInTrack(PlaneKey(sector, station, 3)) == 1;
         int active_num = std::count_if(active_plane.begin(), active_plane.end(), [](bool it) -> bool{return it;});
 
-        bool mark_tag = DiamondDet.GetTrackMuxInSector(sector) == 1 && active_num >= 3;
+        bool mark_tag = DiamondDet.GetTrackMuxInSector(sector) == 1;
 
         std::vector<ChannelKey> hit_selected(PLANES_X_DETECTOR);
         std::vector<std::pair<ChannelKey, CTPPSDiamondRecHit>>::const_iterator hit_iter;
@@ -288,17 +291,16 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
 
                 double Marked_track_time = 12.5;
                 double Marked_track_precision = 25.0;
-                double Marked_hit_time = 0.0;
-                int Marked_hit_channel = -1;
+                double Marked_hit_time = DiamondDet.GetTime(hit_selected[pl_loop]);;
+                int Marked_hit_channel = hit_selected[pl_loop].channel;
+
+                ChannelKey key(sector, station, pl_mark, Marked_hit_channel);
+
+                if(active_num != planes_config[key]) continue;
 
                 for (int pl_loop = 0; pl_loop < PLANES_X_DETECTOR; pl_loop++) {
                     if(!active_plane[pl_loop]) continue;
-
-                    if (pl_loop == pl_mark) {
-                        Marked_hit_time = DiamondDet.GetTime(hit_selected[pl_loop]);
-                        Marked_hit_channel = hit_selected[pl_loop].channel;
-                        continue;
-                    }
+                    if (pl_loop == pl_mark) continue;
 
                     double Others_hit_time = DiamondDet.GetTime(hit_selected[pl_loop]);
                     double Others_hit_prec = DiamondDet.GetPadPrecision(hit_selected[pl_loop]);
@@ -312,8 +314,6 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
 
                 //std::cout<<"T = "<<Marked_hit_time<<"; Trk = "<<Marked_track_time<<std::endl;
                 double Marked_hit_difference = Marked_hit_time - Marked_track_time;
-
-                ChannelKey key(sector, station, pl_mark, Marked_hit_channel);
 
                 histos.l2_res[key]->Fill(Marked_hit_difference);
                 histos.trk_time[key]->Fill(Marked_track_time);
