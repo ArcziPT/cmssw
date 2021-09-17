@@ -2,7 +2,7 @@
 
 namespace pt = boost::property_tree;
 
-void JSON::save(const CTPPSGeometry& geom,
+void JSON::save_calib(const CTPPSGeometry& geom,
 	const DiamondTimingCalibration& calib,
 	std::map<ChannelKey, double>& res,
 	std::string output_file_name){
@@ -80,7 +80,7 @@ void JSON::save(const CTPPSGeometry& geom,
 	pt::write_json(output_file, root);
 }
 
-PPSTimingCalibration JSON::read(const std::string& path){
+PPSTimingCalibration JSON::read_calib(const std::string& path){
 	pt::ptree mother_node;
 	pt::read_json(path, mother_node);
 
@@ -114,4 +114,32 @@ PPSTimingCalibration JSON::read(const std::string& path){
 	}
 
 	return PPSTimingCalibration(formula, params, time_info);
+}
+
+std::map<ChannelKey, int> JSON::read_plane_config(const std::string& path){
+	pt::ptree mother_node;
+	pt::read_json(path, mother_node);
+
+	std::map<ChannelKey, int> planes_config;
+
+	for (pt::ptree::value_type& par : mother_node.get_child("Sectors")) {
+		auto sector = par.second.get<int>("sector");
+
+		for (pt::ptree::value_type& st : par.second.get_child("Stations")) {
+		auto station = st.second.get<int>("station");
+
+			for (pt::ptree::value_type& pl : st.second.get_child("Planes")) {
+				auto plane = pl.second.get<int>("plane");
+
+				for (pt::ptree::value_type& ch : pl.second.get_child("Channels")) {
+					auto channel = ch.second.get<int>("channel");
+					int planes = ch.second.get<int>("planes");
+
+					planes_config[ChannelKey(sector, station, plane, channel)] = planes;
+				}
+			}
+		}
+	}
+
+	return planes_config;
 }

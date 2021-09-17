@@ -17,12 +17,14 @@
 
 class JSON{
 public:
-	static void save(const CTPPSGeometry& geom,
+	static void save_calib(const CTPPSGeometry& geom,
 		const DiamondTimingCalibration& calib,
 		std::map<ChannelKey, double>& res,
 		std::string output_file_name);
 
-	static PPSTimingCalibration read(const std::string& path);
+	static PPSTimingCalibration read_calib(const std::string& path);
+
+	static std::map<ChannelKey, int> read_plane_config(const std::string& path);
 };
 
 #endif
