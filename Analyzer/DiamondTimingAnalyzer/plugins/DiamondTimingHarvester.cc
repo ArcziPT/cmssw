@@ -182,19 +182,17 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
         auto* resHist = iBooker.book1D("curr_res_" + ch_name, "Resolution in current step;Resolution (ns);Entries", 1200, 0, 0.5);
         resHist->Fill(Resolution_L2_map_[histo_key]);
 
-        auto* resStepHist = iBooker.book2D("res_vs_step_" + ch_name, "Resolution vs Step;Step;Resolution (ns)", 1200, -1, loop_index+1, 1200, 0, 0.5);
+        auto* resStepHist = iBooker.book2D("res_vs_step_" + ch_name, "Resolution vs Step;Step;Resolution (ns)", 1200, -1, loop_index+2, 1200, 0, 0.5);
         resStepHist->getTH2F()->SetMarkerStyle(20);
         for(int i=0; i<=loop_index; i++){
             resStepHist->Fill(i, calibs[i].timePrecision(histo_key));
         }
         resStepHist->Fill(loop_index+1, Resolution_L2_map_[histo_key]);
-    }
-
-    if(loop_index > 0){
-        for(auto e : Resolution_L2_map_){
+    
+        if(loop_index > 0){
             auto* mEl = iBooker.book1D("diff_res_" + ch_name, "Resolution difference;Difference (ns);Entries", 1200, -1, 1);
-            
-            double diff = std::abs(e.second - calibs[loop_index].timePrecision(e.first));
+                
+            double diff = std::abs(Resolution_L2_map_[histo_key] - calibs[loop_index].timePrecision(histo_key));
             mEl->Fill(diff);
         }
     }
