@@ -24,6 +24,12 @@ options.register ('calibInput',
 				  VarParsing.varType.string,
 				  "Calibration input file for this iteration")
 
+options.register ('planesConfig',
+				  'planes.json',
+				  VarParsing.multiplicity.singleton,
+				  VarParsing.varType.string,
+				  "planes config file")
+
 options.register ('geometryFile',
 				  'Geometry.VeryForwardGeometry.geometryRPFromDD_2018_cfi',
 				  VarParsing.multiplicity.singleton,
@@ -264,6 +270,7 @@ process.diamondTimingWorker = DQMEDAnalyzer("DiamondTimingWorker",
     tagPixelLocalTrack = cms.InputTag("ctppsPixelLocalTracks"),
     tagLocalTrack = cms.InputTag("ctppsDiamondLocalTracks"),
     tagValidOOT = cms.int32(-1),
+    planesConfig = cms.string(options.planesConfig),
     Ntracks_Lcuts = cms.vint32([-1,1,-1,1]),
     Ntracks_Ucuts = cms.vint32([-1,6,-1,6]),
 )
