@@ -104,7 +104,7 @@ DiamondTimingHarvester::DiamondTimingHarvester(const edm::ParameterSet& iConfig)
     calibs.push_back(DiamondTimingCalibration()); //empty to be replaced by db calibration
     for(auto& file : calib_files){
         edm::LogInfo("DiamondTimingHarvester")<<"Opening file "<<file;
-        calibs.push_back(DiamondTimingCalibration(JSON::read(file)));
+        calibs.push_back(DiamondTimingCalibration(JSON::read_calib(file)));
     }
 }
 
@@ -197,7 +197,7 @@ void DiamondTimingHarvester::dqmEndRun(DQMStore::IBooker &iBooker,
         }
     }
 
-    JSON::save(geom, calib, Resolution_L2_map_, output_file);
+    JSON::save_calib(geom, calib, Resolution_L2_map_, output_file);
 }
 
 // ------------ method fills 'descriptions' with the allowed parameters for the module  ------------

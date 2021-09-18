@@ -30,6 +30,12 @@ options.register ('calibOutput',
 				  VarParsing.varType.string,
 				  "Output file for calibration from this iteration")
 
+options.register ('calibInput',
+				  '',
+				  VarParsing.multiplicity.singleton,
+				  VarParsing.varType.string,
+				  "Input file")
+
 options.register ('geometryFile',
 				  'Geometry.VeryForwardGeometry.geometryRPFromDD_2018_cfi',
 				  VarParsing.multiplicity.singleton,
@@ -78,18 +84,19 @@ from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 from Configuration.AlCa.GlobalTag import GlobalTag
 process.GlobalTag = GlobalTag(process.GlobalTag, '106X_dataRun2_v26', '')
 
-process.GlobalTag.toGet = cms.VPSet(
-	cms.PSet(record = cms.string('PPSTimingCalibrationRcd'),
-			tag = cms.string('PPSDiamondTimingCalibration_v1'),
-			connect = cms.string("frontier://FrontierProd/CMS_CONDITIONS")
+if options.calibInput == '':
+    process.GlobalTag.toGet = cms.VPSet(
+        cms.PSet(record = cms.string('PPSTimingCalibrationRcd'),
+                    tag = cms.string('PPSDiamondTimingCalibration_v1'),
+                connect = cms.string("frontier://FrontierProd/CMS_CONDITIONS")
+                )
+    )
+else:
+	process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
+		calibrationFile = cms.string(options.calibInput),
+		subDetector = cms.uint32(2),
+		appendToDataLabel = cms.string('')
 	)
-)
-# else:
-# 	process.ppsTimingCalibrationESSource = cms.ESSource('PPSTimingCalibrationESSource',
-# 		calibrationFile = cms.string(options.calibInput),
-# 		subDetector = cms.uint32(2),
-# 		appendToDataLabel = cms.string('')
-# 	)
 
 # rechits production
 process.load("DQM.Integration.config.environment_cfi")
@@ -98,9 +105,9 @@ process.load(options.geometryFile)
 
 process.diamondTimingHarvester = DQMEDHarvester("DiamondTimingHarvester",
    calib_json_output = cms.string(options.calibOutput),
+   calibInput = cms.string(options.calibInput),
    calibFiles = cms.vstring(options.calibFiles),
    loopIndex = cms.int32(options.loopIndex),
-   treshold = cms.double(options.treshold),
    meanMax = cms.double(options.meanMax),
    rmsMax = cms.double(options.rmsMax)
 )

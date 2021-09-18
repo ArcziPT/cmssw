@@ -24,7 +24,7 @@ public:
 
 	static PPSTimingCalibration read_calib(const std::string& path);
 
-	static std::map<ChannelKey, int> read_plane_config(const std::string& path);
+	static std::map<ChannelKey, int> read_planes_config(const std::string& path);
 };
 
 #endif

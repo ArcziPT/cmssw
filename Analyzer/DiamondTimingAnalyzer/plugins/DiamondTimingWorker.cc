@@ -44,6 +44,7 @@
 #include "CondFormats/DataRecord/interface/PPSTimingCalibrationRcd.h"
 
 #include "DiamondDetectorClass.h"
+#include "JSON.h"
 
 //
 // class declaration
@@ -291,8 +292,8 @@ void DiamondTimingWorker::analyze(const edm::Event& iEvent, const edm::EventSetu
 
                 double Marked_track_time = 12.5;
                 double Marked_track_precision = 25.0;
-                double Marked_hit_time = DiamondDet.GetTime(hit_selected[pl_loop]);;
-                int Marked_hit_channel = hit_selected[pl_loop].channel;
+                double Marked_hit_time = DiamondDet.GetTime(hit_selected[pl_mark]);;
+                int Marked_hit_channel = hit_selected[pl_mark].channel;
 
                 ChannelKey key(sector, station, pl_mark, Marked_hit_channel);
 

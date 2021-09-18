@@ -116,7 +116,7 @@ PPSTimingCalibration JSON::read_calib(const std::string& path){
 	return PPSTimingCalibration(formula, params, time_info);
 }
 
-std::map<ChannelKey, int> JSON::read_plane_config(const std::string& path){
+std::map<ChannelKey, int> JSON::read_planes_config(const std::string& path){
 	pt::ptree mother_node;
 	pt::read_json(path, mother_node);
 
